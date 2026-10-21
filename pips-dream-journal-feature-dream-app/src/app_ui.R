@@ -5,8 +5,11 @@
 #' @param lexicons Output of `load_lexicons()`; used for the theme and emotion
 #'   choices in the entry form.
 #' @param css_path Stylesheet for the dreamy calendar.
+#' @param splash_seconds Minimum seconds the cloudy loading screen is shown;
+#'   0 turns it off.
 #' @return A bslib page.
-dream_app_ui <- function(lexicons, css_path = "src/www/dream_calendar.css") {
+dream_app_ui <- function(lexicons, css_path = "src/www/dream_calendar.css",
+                         splash_seconds = 3) {
   theme_choices <- setNames(lexicons$theme_meta$theme, lexicons$theme_meta$label)
   emotion_choices <- setNames(lexicons$emotion_meta$emotion,
                               lexicons$emotion_meta$label)
@@ -15,10 +18,13 @@ dream_app_ui <- function(lexicons, css_path = "src/www/dream_calendar.css") {
     title = "Dream Journal",
     theme = bs_theme(version = 5, primary = "#5B4B8A", bg = "#FBFAFD",
                      fg = "#222222"),
-    header = tags$head(
-      tags$link(rel = "stylesheet",
-                href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap"),
-      includeCSS(css_path)
+    header = tagList(
+      tags$head(
+        tags$link(rel = "stylesheet",
+                  href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap"),
+        includeCSS(css_path)
+      ),
+      if (splash_seconds > 0) splash_screen(splash_seconds)
     ),
     sidebar = sidebar(
       width = 260,

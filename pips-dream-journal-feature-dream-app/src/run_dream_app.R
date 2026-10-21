@@ -7,16 +7,19 @@
 #'   `simulate_if_missing` is TRUE, otherwise the app starts empty.
 #' @param lexicon_dir Folder with the word lists.
 #' @param simulate_if_missing Seed a missing journal with simulated nights.
+#' @param splash_seconds Minimum seconds the cloudy loading screen is shown;
+#'   0 turns it off.
 #' @return A shiny.appobj; print it or pass it to `shiny::runApp()`.
 dream_app <- function(journal_path = "data/dream_journal.csv",
                       lexicon_dir = "data/lexicons",
-                      simulate_if_missing = TRUE) {
+                      simulate_if_missing = TRUE,
+                      splash_seconds = 3) {
   if (!file.exists(journal_path) && simulate_if_missing) {
     message("No journal found at ", journal_path, "; creating one from simulated data.")
     write_journal(simulate_dream_journal(), journal_path)
   }
   lexicons <- load_lexicons(lexicon_dir)
-  shinyApp(dream_app_ui(lexicons),
+  shinyApp(dream_app_ui(lexicons, splash_seconds = splash_seconds),
            dream_app_server(normalizePath(journal_path, mustWork = FALSE), lexicons))
 }
 
@@ -26,6 +29,6 @@ dream_app <- function(journal_path = "data/dream_journal.csv",
 #' @param ... Passed on to `shiny::runApp()`, e.g. `port` or `launch.browser`.
 run_dream_app <- function(journal_path = "data/dream_journal.csv",
                           lexicon_dir = "data/lexicons",
-                          simulate_if_missing = TRUE, ...) {
-  runApp(dream_app(journal_path, lexicon_dir, simulate_if_missing), ...)
+                          simulate_if_missing = TRUE, splash_seconds = 3, ...) {
+  runApp(dream_app(journal_path, lexicon_dir, simulate_if_missing, splash_seconds), ...)
 }
