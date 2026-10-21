@@ -130,18 +130,45 @@ dream_app_server <- function(journal_path, lexicons) {
     }, res = 96)
 
     # Sleep ---------------------------------------------------------------
-    output$sleep_trends <- renderPlot(plot_sleep_trends(in_period()), res = 96)
+    sleep_nights <- reactive(last_nights(journal(), as.numeric(input$sleep_window)))
+    sleep_stats <- reactive(sleep_summary(sleep_nights()))
+
+    output$sleep_ring <- renderUI({
+      if (is.null(sleep_stats())) return(p("No nights logged yet."))
+      sleep_ring(sleep_stats()$avg_hours)
+    })
+    output$sleep_bubbles <- renderUI({
+      req(sleep_stats())
+      sleep_stat_bubbles(sleep_stats(), lexicons)
+    })
+    output$sleep_hours_plot <- renderPlot(plot_sleep_hours(sleep_nights()),
+                                          res = 96, bg = "transparent")
+    output$sleep_windows_plot <- renderPlot(plot_sleep_windows(sleep_nights()),
+                                            res = 96, bg = "transparent")
 
     output$recommendations <- renderUI({
-      advice <- sleep_recommendations(journal(), lexicons$emotion_meta,
-                                      input$rec_window)
-      tagList(lapply(seq_len(nrow(advice)), function(i) {
-        div(class = "mb-3",
-            strong(advice$title[i]), br(), advice$message[i],
-            if (advice$source[i] != "")
-              tags$small(class = "text-muted", paste0(" (", advice$source[i], ")")))
-      }))
+      nights <- sleep_nights()
+      window_days <- if (nrow(nights) == 0) 14 else
+        as.numeric(max(nights$date) - min(nights$date)) + 1
+      recommendation_cards(
+        sleep_recommendations(journal(), lexicons$emotion_meta, window_days)
+      )
     })
+
+    # The shareable story picture, made once per change of nights.
+    story_file <- reactive({
+      req(nrow(sleep_nights()) > 0)
+      save_story_card(tempfile(fileext = ".png"), sleep_nights(), lexicons)
+    })
+    output$story_preview <- renderImage({
+      list(src = story_file(), contentType = "image/png",
+           alt = "Preview of your shareable dream stats picture")
+    }, deleteFile = FALSE)
+    output$story_png <- downloadHandler(
+      filename = function() paste0("my-dream-stats-", Sys.Date(), ".png"),
+      content = function(file) file.copy(story_file(), file),
+      contentType = "image/png"
+    )
 
     # Search --------------------------------------------------------------
     output$search_results <- renderUI({

@@ -137,29 +137,6 @@ plot_mentions <- function(mentions, top_n = 10, title = "", fill = "#5B4B8A") {
     dream_theme()
 }
 
-#' Sleep hours, quality, stress and bedtime over time with smoothed trends.
-#'
-#' @param journal A journal tibble.
-#' @return A ggplot with one panel per measure.
-plot_sleep_trends <- function(journal) {
-  if (nrow(journal) == 0) return(empty_plot())
-  long <- journal |>
-    mutate(bedtime_hour = clock_to_evening_hours(bedtime) + 18) |>
-    select(date, `Hours slept` = sleep_hours, `Sleep quality` = sleep_quality,
-           Stress = stress, `Bedtime (hour, 25 = 01:00)` = bedtime_hour) |>
-    pivot_longer(-date, names_to = "measure")
-
-  ggplot(long, aes(date, value)) +
-    geom_line(colour = "grey70") +
-    geom_point(size = 1, colour = "grey45") +
-    { if (nrow(journal) >= 7) geom_smooth(method = "loess", formula = y ~ x,
-                                          se = FALSE, colour = "#5B4B8A",
-                                          linewidth = 1.1) } +
-    facet_wrap(~measure, ncol = 2, scales = "free_y") +
-    labs(x = NULL, y = NULL, title = "Sleep routine over time") +
-    dream_theme()
-}
-
 #' Stress on nights with each theme (box plots), to spot stress-linked themes.
 #'
 #' @param journal A journal tibble.
