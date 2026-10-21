@@ -1,5 +1,7 @@
 # Dream Journal
 
+Edit test
+
 A Shiny app to log dreams and explore their themes, emotions, recurring people
 and objects, and how they relate to sleep and stress. It ships with a simulated
 journal of one dreamer (180 nights) so every view works straight away.

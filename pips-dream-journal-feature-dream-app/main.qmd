@@ -1,0 +1,66 @@
+---
+title: "Dream Journal: an app for exploring dreams, emotions and sleep"
+format: html
+execute:
+  warning: false
+---
+
+## Setup
+
+Run this document from the project root. It loads the packages and the
+functions in `src/`.
+
+```{r}
+source("src/setup.R")
+```
+
+## Simulated dream journal
+
+We simulate 180 nights of one dreamer (`src/simulate_journal.R`). Stress
+follows a weekly rhythm; stressful days lead to later bedtimes, shorter and
+worse sleep, and a higher chance of a negative dream. Dream texts are built
+from templates whose words appear in the word lists in `data/lexicons/`, so
+the app can detect themes, emotions, people and objects in them.
+
+```{r}
+journal <- simulate_dream_journal(n_nights = 180, seed = 2026)
+head(journal[, c("date", "bedtime", "sleep_hours", "stress", "themes", "emotions")])
+```
+
+The app saves new entries to `data/dream_journal.csv`. If that file does not
+exist yet, we start it with the simulated nights (existing entries are kept).
+
+```{r}
+journal_path <- "data/dream_journal.csv"
+if (!file.exists(journal_path)) write_journal(journal, journal_path)
+```
+
+## The app
+
+Run the chunk below in RStudio (or `source("src/setup.R"); run_dream_app()` in
+an R console). It does not launch while rendering this document.
+
+| Tab | What it shows |
+|-----|---------------|
+| New entry | Log a night; *Suggest* ticks themes and emotions found in your text |
+| Calendar | Day, week or month view, coloured by dream valence, stress or sleep |
+| Themes | Heat map of themes over time (one colour per theme) and stress per theme |
+| Emotions | Affective map (valence × arousal; Russell, 1980) and emotions over time |
+| People & objects | Who and what recur in your dreams |
+| Sleep | Sleep routine trends and rule-based recommendations |
+| Search | Full-text search with highlighted matches |
+
+```{r}
+if (interactive()) run_dream_app(journal_path)
+```
+
+## References
+
+Russell, J. A. (1980). A circumplex model of affect. *Journal of Personality
+and Social Psychology, 39*(6), 1161–1178.
+
+```{r}
+#| echo: false
+#| results: asis
+cat(paste("-", recommendation_references), sep = "\n")
+```

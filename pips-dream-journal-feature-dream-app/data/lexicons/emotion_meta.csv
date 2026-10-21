@@ -1,0 +1,9 @@
+emotion,label,valence,arousal,colour
+joy,Joy,0.8,0.5,#F5B700
+calm,Calm,0.6,-0.6,#5AAE61
+surprise,Surprise,0.2,0.8,#56B4E9
+fear,Fear,-0.7,0.8,#D7301F
+anger,Anger,-0.8,0.6,#8B0000
+sadness,Sadness,-0.7,-0.5,#4575B4
+shame,Shame,-0.6,0.1,#9E6EBD
+confusion,Confusion,-0.3,0.3,#999999
