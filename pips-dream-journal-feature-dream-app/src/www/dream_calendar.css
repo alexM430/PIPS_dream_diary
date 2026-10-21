@@ -1,0 +1,162 @@
+/* Dreamy pastel styling for the Calendar tab (see src/calendar_widget.R). */
+
+:root {
+  --dream-ink: #4A3B5C;
+  --dream-muted: #9A8AAE;
+  --dream-lilac: #C9A7EB;
+  --dream-pink: #F7A8C8;
+  --dream-card: rgba(255, 255, 255, 0.72);
+  --dream-font: "Quicksand", "Nunito", system-ui, sans-serif;
+}
+
+/* Tab background: soft lilac-to-pink sky with a few stars. */
+.dream-sky {
+  font-family: var(--dream-font);
+  color: var(--dream-ink);
+  border-radius: 28px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 12% 18%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 78% 10%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 90% 62%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 35% 85%, #fff 0 1px, transparent 2px),
+    linear-gradient(160deg, #EDE4FF 0%, #FCE7F3 55%, #FFF1E6 100%);
+}
+
+/* Header: arrows, month title, view switch and colour picker. */
+.dream-cal-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.dream-cal-nav { display: flex; align-items: center; gap: 10px; }
+.dream-cal-title {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin: 0;
+  min-width: 13ch;
+  text-align: center;
+  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dream-sky .btn.dream-arrow {
+  width: 40px; height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--dream-card);
+  color: var(--dream-ink);
+  font-size: 1.3rem;
+  line-height: 1;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.18);
+}
+.dream-sky .btn.dream-arrow:hover { background: #fff; transform: scale(1.06); }
+
+.dream-cal-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.dream-cal-controls .form-group { margin: 0; }
+.dream-cal-controls .control-label { display: none; }
+
+/* View switch as pastel pills. */
+#cal_view .shiny-options-group { display: flex; background: var(--dream-card);
+  border-radius: 999px; padding: 4px; gap: 2px; }
+#cal_view label { margin: 0; cursor: pointer; }
+#cal_view input { position: absolute; opacity: 0; pointer-events: none; }
+#cal_view span { display: block; padding: 6px 16px; border-radius: 999px;
+  font-weight: 600; color: var(--dream-muted); transition: all .2s; }
+#cal_view input:checked + span { background: linear-gradient(90deg, var(--dream-lilac), var(--dream-pink));
+  color: #fff; box-shadow: 0 3px 10px rgba(236, 72, 153, 0.25); }
+
+.dream-cal-controls select,
+.dream-cal-controls .selectize-input {
+  border-radius: 999px !important;
+  border: none !important;
+  background: var(--dream-card) !important;
+  font-family: var(--dream-font);
+  font-weight: 600;
+  color: var(--dream-ink);
+  box-shadow: none !important;
+}
+
+/* Summary pills. */
+.dream-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.dream-stat {
+  flex: 1 1 140px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: var(--dream-card);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.10);
+}
+.dream-stat-emoji { font-size: 1.6rem; }
+.dream-stat-value { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.dream-stat-label { font-size: .78rem; color: var(--dream-muted); }
+
+/* Calendar layout: grid on the left, selected night on the right. */
+.dream-cal-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .dream-cal-body { grid-template-columns: 1fr; } }
+
+.dream-cal { background: var(--dream-card); border-radius: 24px; padding: 16px;
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.12); }
+.dream-cal-weekdays, .dream-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.dream-cal-weekday { text-align: center; font-size: .78rem; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--dream-muted); padding-bottom: 6px; }
+
+/* Day tiles. */
+.dream-day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  min-height: 56px;
+  border-radius: 16px;
+  background: var(--day-fill, #fff);
+  box-shadow: 0 2px 8px rgba(74, 59, 92, 0.08);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.dream-day:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(236, 72, 153, 0.22); }
+.dream-day-num { position: absolute; top: 6px; left: 9px; font-size: .8rem; font-weight: 700; }
+.dream-day-emoji { font-size: 1.45rem; }
+.dream-day-dots { position: absolute; bottom: 6px; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 3px; }
+.dream-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #fff; }
+
+.dream-day.is-empty { background: rgba(255, 255, 255, 0.35); box-shadow: none;
+  border: 1.5px dashed rgba(201, 167, 235, 0.6); }
+.dream-day.is-outside { opacity: 0.35; }
+.dream-day.is-selected {
+  outline: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgba(236, 72, 153, 0.35), 0 10px 24px rgba(139, 92, 246, 0.35);
+}
+
+/* Legend. */
+.dream-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 14px; font-size: .8rem; color: var(--dream-muted); }
+.dream-legend-bar { width: 120px; height: 10px; border-radius: 999px; }
+.dream-legend-note { margin-left: 8px; }
+
+/* Selected night card and the list below it. */
+.dream-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dream-night {
+  background: linear-gradient(160deg, rgba(255,255,255,.92), rgba(255,240,248,.92));
+  border-radius: 24px; padding: 20px;
+  box-shadow: 0 8px 30px rgba(236, 72, 153, 0.15);
+}
+.dream-night-date { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+.dream-night-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dream-night-facts span { background: #F5EDFF; border-radius: 999px; padding: 3px 10px;
+  font-size: .82rem; font-weight: 600; }
+.dream-night-text { font-style: italic; line-height: 1.55; margin-bottom: 12px; }
+.dream-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dream-chip { border: 2px solid var(--dream-lilac); background: #fff; border-radius: 999px;
+  padding: 2px 10px; font-size: .8rem; font-weight: 600; }
+
+.dream-list { background: var(--dream-card); border-radius: 24px; padding: 16px;
+  max-height: 360px; overflow-y: auto; }
+.dream-list h6 { font-weight: 700; color: var(--dream-muted); text-transform: uppercase;
+  letter-spacing: .06em; font-size: .75rem; }

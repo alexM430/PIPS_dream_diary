@@ -16,7 +16,6 @@ dream_app_server <- function(journal_path, lexicons) {
       last <- if (length(dates) > 0) max(dates) else Sys.Date()
       first <- if (length(dates) > 0) min(dates) else Sys.Date() - 30
       updateDateRangeInput(session, "period", start = first, end = last)
-      updateDateInput(session, "cal_date", value = last)
       updateDateInput(session, "entry_date", value = last + 1)
     }) |> bindEvent(TRUE, once = TRUE)
 
@@ -77,42 +76,28 @@ dream_app_server <- function(journal_path, lexicons) {
     }, digits = 1)
 
     # Calendar ------------------------------------------------------------
-    cal_range <- reactive({
-      req(input$cal_date)
-      day <- as.Date(input$cal_date)
-      switch(input$cal_view,
-             day = c(day, day),
-             week = floor_date(day, "week", week_start = 1) + c(0, 6),
-             month = c(floor_date(day, "month"),
-                       ceiling_date(day, "month") - 1))
-    })
+    # The selected night; starts at the most recent entry.
+    cal_day <- reactiveVal(
+      if (nrow(isolate(journal())) > 0) max(isolate(journal())$date) else Sys.Date()
+    )
+    observeEvent(input$cal_click, cal_day(as.Date(input$cal_click)))
+    observeEvent(input$cal_prev, cal_day(shift_calendar_date(cal_day(), input$cal_view, -1)))
+    observeEvent(input$cal_next, cal_day(shift_calendar_date(cal_day(), input$cal_view, 1)))
+
+    cal_range <- reactive(calendar_range(cal_day(), input$cal_view))
     cal_entries <- reactive({
       filter(scored(), date >= cal_range()[1], date <= cal_range()[2])
     })
 
-    output$cal_summary <- renderUI({
-      entries <- cal_entries()
-      boxes <- if (nrow(entries) == 0) {
-        list(value_box("Nights logged", 0))
-      } else {
-        list(
-          value_box("Nights logged", nrow(entries), showcase = icon("book")),
-          value_box("Dreams recalled", sum(entries$dream_text != ""),
-                    showcase = icon("cloud")),
-          value_box("Avg. hours slept", sprintf("%.1f", mean(entries$sleep_hours)),
-                    showcase = icon("bed")),
-          value_box("Avg. sleep quality", sprintf("%.1f / 10", mean(entries$sleep_quality)),
-                    showcase = icon("star")),
-          value_box("Avg. stress", sprintf("%.1f / 10", mean(entries$stress)),
-                    showcase = icon("bolt"))
-        )
-      }
-      do.call(layout_columns, c(list(fill = FALSE), boxes))
+    output$cal_title <- renderText(calendar_title(cal_day(), input$cal_view))
+    output$cal_summary <- renderUI(calendar_stats(cal_entries()))
+    output$cal_grid <- renderUI({
+      dream_calendar(scored(), cal_range()[1], cal_range()[2], input$cal_fill,
+                     selected = cal_day(), lexicons = lexicons)
     })
-
-    output$cal_plot <- renderPlot({
-      plot_calendar(scored(), cal_range()[1], cal_range()[2], input$cal_fill)
-    }, res = 96)
+    output$cal_night <- renderUI({
+      dream_night_card(filter(scored(), date == cal_day()), cal_day(), lexicons)
+    })
 
     output$cal_entries <- renderUI({
       entries <- cal_entries() |> arrange(desc(date))
@@ -195,12 +180,12 @@ entry_card <- function(entry, highlight = NULL) {
       "<mark>\\0</mark>")
   }
   tags_line <- paste(c(split_tags(entry$themes)[[1]], split_tags(entry$emotions)[[1]]),
-                     collapse = " · ")
+                     collapse = " \u00B7 ")
   div(
     class = "border-bottom pb-2 mb-2",
     strong(format(entry$date, "%A %d %B %Y")),
     tags$small(class = "text-muted ms-2",
-               sprintf("%s–%s · %.1f h · quality %d · stress %d",
+               sprintf("%s\u2013%s \u00B7 %.1f h \u00B7 quality %d \u00B7 stress %d",
                        entry$bedtime, entry$wake_time, entry$sleep_hours,
                        entry$sleep_quality, entry$stress)),
     p(class = "mb-1", HTML(text)),

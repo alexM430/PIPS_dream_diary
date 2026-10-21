@@ -4,8 +4,9 @@
 #'
 #' @param lexicons Output of `load_lexicons()`; used for the theme and emotion
 #'   choices in the entry form.
+#' @param css_path Stylesheet for the dreamy calendar.
 #' @return A bslib page.
-dream_app_ui <- function(lexicons) {
+dream_app_ui <- function(lexicons, css_path = "src/www/dream_calendar.css") {
   theme_choices <- setNames(lexicons$theme_meta$theme, lexicons$theme_meta$label)
   emotion_choices <- setNames(lexicons$emotion_meta$emotion,
                               lexicons$emotion_meta$label)
@@ -14,6 +15,11 @@ dream_app_ui <- function(lexicons) {
     title = "Dream Journal",
     theme = bs_theme(version = 5, primary = "#5B4B8A", bg = "#FBFAFD",
                      fg = "#222222"),
+    header = tags$head(
+      tags$link(rel = "stylesheet",
+                href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap"),
+      includeCSS(css_path)
+    ),
     sidebar = sidebar(
       width = 260,
       dateRangeInput("period", "Period shown in the charts",
@@ -60,22 +66,36 @@ dream_app_ui <- function(lexicons) {
 
     nav_panel(
       "Calendar", icon = icon("calendar-days"),
-      layout_columns(
-        col_widths = c(4, 4, 4), fill = FALSE,
-        radioButtons("cal_view", "View", inline = TRUE,
-                     choices = c(Day = "day", Week = "week", Month = "month"),
-                     selected = "month"),
-        dateInput("cal_date", "Date", weekstart = 1, format = "d M yyyy"),
-        selectInput("cal_fill", "Colour days by",
-                    c("Dream valence" = "valence", "Sleep quality" = "sleep_quality",
-                      "Stress" = "stress", "Hours slept" = "sleep_hours"))
-      ),
-      uiOutput("cal_summary"),
-      layout_columns(
-        col_widths = c(7, 5),
-        card(full_screen = TRUE, plotOutput("cal_plot", height = "420px")),
-        card(card_header("Dreams in this period"), uiOutput("cal_entries"),
-             max_height = "480px")
+      div(
+        class = "dream-sky",
+        div(
+          class = "dream-cal-header",
+          div(class = "dream-cal-nav",
+              actionButton("cal_prev", "\u2039", class = "dream-arrow",
+                           `aria-label` = "Previous"),
+              h2(class = "dream-cal-title", textOutput("cal_title", inline = TRUE)),
+              actionButton("cal_next", "\u203A", class = "dream-arrow",
+                           `aria-label` = "Next")),
+          div(class = "dream-cal-controls",
+              radioButtons("cal_view", "View", inline = TRUE,
+                           choices = c(Day = "day", Week = "week", Month = "month"),
+                           selected = "month"),
+              selectInput("cal_fill", "Colour days by", width = "190px",
+                          c("\U0001F497 Dream mood" = "valence",
+                            "\u2B50 Sleep quality" = "sleep_quality",
+                            "\u26A1 Stress" = "stress",
+                            "\U0001F4A4 Hours slept" = "sleep_hours")))
+        ),
+        uiOutput("cal_summary"),
+        div(
+          class = "dream-cal-body",
+          uiOutput("cal_grid"),
+          div(class = "dream-side",
+              uiOutput("cal_night"),
+              div(class = "dream-list",
+                  h6("All dreams in this view"),
+                  uiOutput("cal_entries")))
+        )
       )
     ),
 

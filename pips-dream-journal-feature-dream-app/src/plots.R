@@ -83,8 +83,8 @@ plot_affect_map <- function(journal, emotion_meta, colour_by = "stress") {
     scale_colour_viridis_c(option = "magma", end = 0.9, direction = -1,
                            name = str_to_sentence(str_replace(colour_by, "_", " "))) +
     coord_equal(xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1)) +
-    labs(x = "Valence (unpleasant → pleasant)",
-         y = "Arousal (calm → intense)",
+    labs(x = "Valence (unpleasant \u2192 pleasant)",
+         y = "Arousal (calm \u2192 intense)",
          title = "Affective map of your dreams") +
     dream_theme()
 }
@@ -113,50 +113,6 @@ plot_emotion_timeline <- function(journal, emotion_meta, period = "week") {
     labs(x = NULL, y = "Share of emotions",
          title = paste("Emotions per", period)) +
     dream_theme()
-}
-
-#' Calendar grid (Mon-Sun columns) coloured by one variable.
-#'
-#' @param journal A journal tibble with `valence` (see `add_affect_scores()`).
-#' @param start,end First and last date shown.
-#' @param fill_by One of "valence", "sleep_quality", "stress", "sleep_hours".
-#' @return A ggplot. Days without an entry are grey.
-plot_calendar <- function(journal, start, end, fill_by = "valence") {
-  days <- tibble(date = seq(as.Date(start), as.Date(end), by = "day")) |>
-    left_join(journal, by = "date") |>
-    mutate(
-      weekday = wday(date, label = TRUE, week_start = 1, abbr = TRUE,
-                     locale = "C"),
-      week_start = floor_date(date, "week", week_start = 1),
-      # Discrete y axis with the earliest week on top.
-      week = factor(format(week_start, "%d %b"),
-                    levels = rev(unique(format(sort(week_start), "%d %b")))),
-      day_label = day(date)
-    )
-
-  fill_scale <- switch(
-    fill_by,
-    valence = scale_fill_gradient2(low = "#4575B4", mid = "#F7F7F7",
-                                   high = "#E69F00", limits = c(-1, 1),
-                                   na.value = "grey92", name = "Dream valence"),
-    stress = scale_fill_distiller(palette = "Reds", direction = 1,
-                                  limits = c(1, 10), na.value = "grey92",
-                                  name = "Stress"),
-    sleep_quality = scale_fill_distiller(palette = "Greens", direction = 1,
-                                         limits = c(1, 10), na.value = "grey92",
-                                         name = "Sleep quality"),
-    sleep_hours = scale_fill_distiller(palette = "Blues", direction = 1,
-                                       na.value = "grey92", name = "Hours slept"),
-    stop("Unknown fill_by: ", fill_by, call. = FALSE)
-  )
-
-  ggplot(days, aes(weekday, week)) +
-    geom_tile(aes(fill = .data[[fill_by]]), colour = "white", linewidth = 1.2) +
-    geom_text(aes(label = day_label), size = 3.6, colour = "grey20") +
-    fill_scale +
-    labs(x = NULL, y = "Week of") +
-    dream_theme() +
-    theme(panel.grid = element_blank())
 }
 
 #' Horizontal bar chart of the most frequently mentioned categories.
