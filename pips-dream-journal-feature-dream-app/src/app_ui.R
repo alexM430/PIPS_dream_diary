@@ -280,140 +280,44 @@ settings_tab <- function() {
 #' @param splash_seconds Minimum seconds the cloudy loading screen is shown;
 #'   0 turns it off.
 #' @return A bslib page.
-dream_app_ui <- function(lexicons) {
-  theme_choices <- setNames(lexicons$theme_meta$theme, lexicons$theme_meta$label)
-  emotion_choices <- setNames(lexicons$emotion_meta$emotion,
-                              lexicons$emotion_meta$label)
-
-  page_navbar(
-    title = "Dream Journal",
-    theme = bs_theme(version = 5, primary = "#5B4B8A", bg = "#FBFAFD",
-                     fg = "#222222"),
-    sidebar = sidebar(
-      width = 260,
-      # Unchecked means the app shows personal data.
-      shiny::checkboxInput(
-        inputId = "demo_mode",
-        label = "Demo mode — show an example diary",
-        value = FALSE
-      ),
-      shiny::uiOutput("data_mode_status"),
-      dateRangeInput("period", "Period shown in the charts",
-                     weekstart = 1, format = "d M yyyy"),
-      radioButtons("bin", "Group charts by", inline = TRUE,
-                   choices = c(Week = "week", Month = "month")),
-      helpText("The calendar and new-entry tabs have their own date pickers.")
-    ),
-
-    nav_panel(
-      "New entry", icon = icon("pen"),
-      layout_columns(
-        col_widths = c(5, 7),
-        card(
-          card_header("How did you sleep?"),
-          dateInput("entry_date", "Night of (the evening you went to bed)",
-                    weekstart = 1, format = "d M yyyy"),
-          layout_columns(
-            fill = FALSE,
-            textInput("entry_bedtime", "Went to bed", value = "23:30",
-                      placeholder = "HH:MM"),
-            textInput("entry_wake", "Woke up", value = "07:30",
-                      placeholder = "HH:MM")
-          ),
-          sliderInput("entry_quality", "Sleep quality", 1, 10, 6, step = 1),
-          sliderInput("entry_stress", "Stress the day before", 1, 10, 5, step = 1),
-          textAreaInput("entry_text", "What did you dream?", rows = 5,
-                        placeholder = "Leave empty if you don't remember a dream."),
-          actionButton("detect", "Suggest themes & emotions from my text",
-                       icon = icon("wand-magic-sparkles"),
-                       class = "btn-outline-primary btn-sm"),
-          checkboxGroupInput("entry_themes", "Themes", theme_choices, inline = TRUE),
-          checkboxGroupInput("entry_emotions", "Emotions", emotion_choices,
-                             inline = TRUE),
-          shiny::uiOutput("save_entry_control")
-        ),
-        card(
-          card_header("Latest entries"),
-          tableOutput("recent_entries")
-        )
-      )
-    ),
-
-    nav_panel(
-      "Calendar", icon = icon("calendar-days"),
-      layout_columns(
-        col_widths = c(4, 4, 4), fill = FALSE,
-        radioButtons("cal_view", "View", inline = TRUE,
-                     choices = c(Day = "day", Week = "week", Month = "month"),
-                     selected = "month"),
-        dateInput("cal_date", "Date", weekstart = 1, format = "d M yyyy"),
-        selectInput("cal_fill", "Colour days by",
-                    c("Dream valence" = "valence", "Sleep quality" = "sleep_quality",
-                      "Stress" = "stress", "Hours slept" = "sleep_hours"))
-      ),
-      uiOutput("cal_summary"),
-      layout_columns(
-        col_widths = c(7, 5),
-        card(full_screen = TRUE, plotOutput("cal_plot", height = "420px")),
-        card(card_header("Dreams in this period"), uiOutput("cal_entries"),
-             max_height = "480px")
-      )
-    ),
-
-    nav_panel(
-      "Themes", icon = icon("fire"),
-      card(full_screen = TRUE, plotOutput("theme_heatmap", height = "480px")),
-      card(full_screen = TRUE,
-           card_header("Stress on nights with each theme"),
-           plotOutput("theme_stress", height = "400px"))
-    ),
-
-    nav_panel(
-      "Emotions", icon = icon("face-smile"),
-      layout_columns(
-        col_widths = c(6, 6),
-        card(
-          full_screen = TRUE,
-          selectInput("affect_colour", "Colour dreams by",
-                      c(Stress = "stress", "Sleep quality" = "sleep_quality",
-                        "Hours slept" = "sleep_hours"), width = "220px"),
-          plotOutput("affect_map", height = "480px")
-        ),
-        card(full_screen = TRUE, plotOutput("emotion_timeline", height = "540px"))
-      )
-    ),
-
-    nav_panel(
-      "People & objects", icon = icon("users"),
-      sliderInput("top_n", "Show top", 3, 20, 8, step = 1, width = "250px"),
-      layout_columns(
-        col_widths = c(6, 6),
-        card(plotOutput("people_plot", height = "400px")),
-        card(plotOutput("objects_plot", height = "400px"))
-      ),
-      helpText("Detected with the word lists in data/lexicons/people.csv and objects.csv.")
-    ),
-
-    nav_panel(
-      "Sleep", icon = icon("moon"),
-      layout_columns(
-        col_widths = c(7, 5),
-        card(full_screen = TRUE, plotOutput("sleep_trends", height = "520px")),
-        card(
-          card_header("Recommendations"),
-          sliderInput("rec_window", "Based on the last ... nights", 7, 60, 14),
-          uiOutput("recommendations"),
-          tags$small(class = "text-muted",
-                     "General sleep-hygiene advice, not medical advice.")
-        )
-      )
-    ),
-
-    nav_panel(
-      "Search", icon = icon("magnifying-glass"),
-      textInput("search", NULL, placeholder = "Search your dreams, e.g. 'mother' or 'falling'",
-                width = "100%"),
-      uiOutput("search_results")
-    )
+dream_app_ui <- function(css_paths = c("src/www/dream_calendar.css", "src/www/sleep_view.css",
+                                       "src/www/dream_app.css"),
+                         splash_seconds = 3) {
+  lavender <- dream_themes$lavender
+  bslib::page_navbar(
+    fillable = FALSE,
+    title = "\U0001F319 Dream Journal",
+    theme = bslib::bs_theme(version = 5, primary = lavender$primary, bg = lavender$bg,
+                            fg = lavender$fg),
+    header = shiny::tagList(
+      shiny::tags$head(
+        shiny::tags$link(rel = "stylesheet",
+          href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap"),
+        shiny::tags$style(shiny::HTML(dream_theme_css())),
+        lapply(css_paths[file.exists(css_paths)], shiny::includeCSS),
+        shiny::tags$script(shiny::HTML(dream_theme_js))),
+      if (splash_seconds > 0) splash_screen(splash_seconds)),
+    sidebar = bslib::sidebar(
+      width = 300,
+      # The user sees labels; Shiny receives the theme names (see dream_themes).
+      shiny::selectInput("app_colour_theme", "\U0001F3A8 App colour theme",
+                         choices = stats::setNames(names(dream_themes),
+                                                   vapply(dream_themes, `[[`, "", "label")),
+                         selected = "lavender"),
+      shiny::dateRangeInput("r_period", "\U0001F4C6 Dates shown in the charts", weekstart = 1),
+      shiny::radioButtons("r_bin", "Group the theme map by",
+                          choices = c(Week = "week", Month = "month"), inline = TRUE),
+      shiny::selectInput("r_top", "Labels per chart",
+                         c("Top 10" = "10", "Top 20" = "20", All = "all")),
+      shiny::p(class = "dream-hint",
+               "Everything stays on your computer. Made for one dreamer at a time.")),
+    entry_tab(),
+    themes_tab(),
+    emotions_tab(),
+    people_tab(),
+    calendar_tab(),
+    sleep_tab(),
+    search_tab(),
+    settings_tab()
   )
 }
