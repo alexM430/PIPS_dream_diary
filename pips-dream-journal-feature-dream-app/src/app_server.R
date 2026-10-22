@@ -69,6 +69,7 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 max(dates)
             else Sys.Date()
             shiny::updateDateRangeInput(session, "r_period", start = first, end = last)
+            shiny::updateDateRangeInput(session, "r_theme_range", start = last - 29, end = last)
             shiny::updateDateInput(session, "r_date", value = last + 1)
             shiny::updateDateInput(session, "r_cal_date", value = last)
         }, once = TRUE)
@@ -205,17 +206,38 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 Night = format(date, "%a %d %b"), Sleep = sprintf("%.1f h", sleep_hours),
                 Quality = sleep_quality, Stress = stress, Themes = gsub(";", ", ", themes))
         })
-        output$r_theme_overview <- shiny::renderUI(theme_overview(in_period(), in_reviews()))
-        output$r_heatmap <- shiny::renderPlot(review_heatmap(in_period(), in_reviews(), input$r_bin,
-            top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
-        output$r_code_stress <- shiny::renderPlot(review_stress_plot(in_period(), in_reviews(),
+        # The Dream themes tab has its own period (last week/month/year, all, custom).
+        theme_range <- shiny::reactive({
+            shiny::req(input$r_theme_window)
+            theme_period_range(journal()$date, input$r_theme_window, input$r_theme_range)
+        })
+        theme_journal <- shiny::reactive(dplyr::filter(journal(), date >= theme_range()[1],
+                                                       date <= theme_range()[2]))
+        theme_reviews <- shiny::reactive(dplyr::filter(reviews(), date %in% theme_journal()$date))
+        output$r_theme_period_text <- shiny::renderText({
+            range <- theme_range()
+            sprintf("%s \u2013 %s \u00B7 %d nights logged%s", format(range[1], "%d %b %Y"),
+                    format(range[2], "%d %b %Y"), nrow(theme_journal()),
+                    if (input$r_theme_window %in% c("7", "30", "365"))
+                        " (counted back from your latest entry)" else "")
+        })
+        output$r_theme_overview <- shiny::renderUI(theme_overview(theme_journal(), theme_reviews()))
+        output$r_theme_clouds <- shiny::renderUI({
+            theme_clouds(theme_counts(theme_reviews(), input$r_top %||% "all"),
+                         nrow(theme_journal()), theme = theme_name(),
+                         selected = input$r_support_code)
+        })
+        shiny::observeEvent(input$r_cloud_click, {
+            shiny::updateSelectInput(session, "r_support_code", selected = input$r_cloud_click)
+        })
+        output$r_code_stress <- shiny::renderPlot(review_stress_plot(theme_journal(), theme_reviews(),
             top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
         output$r_support <- shiny::renderUI({
             shiny::req(input$r_support_code)
-            dates <- dplyr::pull(dplyr::filter(review_long(in_reviews(), "codes"), label == input$r_support_code),
-                date)
-            x <- dplyr::left_join(dplyr::filter(in_period(), date %in% dates),
-                                  dplyr::select(in_reviews(), date, note), by = "date")
+            dates <- dplyr::pull(dplyr::filter(review_long(theme_reviews(), "codes"),
+                                               label == input$r_support_code), date)
+            x <- dplyr::left_join(dplyr::filter(theme_journal(), date %in% dates),
+                                  dplyr::select(theme_reviews(), date, note), by = "date")
             x <- dplyr::arrange(x, dplyr::desc(date))
             if (!nrow(x)) return(shiny::p(class = "dream-hint", "No dreams with this theme in the chosen dates."))
             shiny::tagList(lapply(seq_len(nrow(x)), function(i) {
@@ -241,7 +263,7 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
         output$r_coverage <- shiny::renderText({
             x <- dplyr::filter(matches(), stage == input$r_vad_stage)
             if (!nrow(state()$vad)) 
-                return("VAD is optional and has not been imported. Emotion frequency charts do not require it. Import a documented NRC VAD v2 CSV under Settings / export to enable the 3D plot.")
+                return("No VAD lexicon is saved in this journal, so the map is empty. The chart above does not need it.")
             sprintf("%d / %d distinct labels matched; %d / %d label-night occurrences matched. Source: %s. Scale: %g to %g.", 
                 sum(is.finite(x$valence)), nrow(x), sum(x$nights[is.finite(x$valence)]), sum(x$nights), 
                 state()$vad_source, state()$vad_limits[1], state()$vad_limits[2])
@@ -430,27 +452,6 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             s$names <- dplyr::filter(s$names, alias != input$r_forget_alias)
             persist(s)
         }, error = notify_error))
-        shiny::observeEvent(input$r_import_vad, tryCatch({
-            shiny::req(input$r_vad_file)
-            if (!isTRUE(input$r_vad_confirm)) 
-                stop("Check the version, score scale, column mapping and usage terms first.")
-            source <- stringr::str_squish(input$r_vad_source)
-            if (!nzchar(source)) 
-                stop("Provide a source citation.")
-            limits <- if (input$r_vad_scale == "signed") 
-                c(-1, 1)
-            else c(0, 1)
-            vad <- review_import_vad(input$r_vad_file$datapath, limits)
-            s <- state()
-            s$vad <- vad
-            s$vad_limits <- limits
-            s$vad_source <- source
-            s$vad_version <- "v2 (user-confirmed)"
-            persist(s)
-            shiny::showNotification(sprintf("Imported %d VAD terms.", nrow(vad)))
-        }, error = notify_error))
-        output$r_vad_info <- shiny::renderText(sprintf("%d terms stored locally. %s \u00B7 %s", nrow(state()$vad), 
-            state()$vad_version, state()$vad_source))
         output$r_export <- shiny::downloadHandler(filename = function() paste0("reviewed-journal-", Sys.Date(), 
             ".csv"), content = function(file) {
             readr::write_csv(dplyr::left_join(journal(), reviews(), by = "date"), file)

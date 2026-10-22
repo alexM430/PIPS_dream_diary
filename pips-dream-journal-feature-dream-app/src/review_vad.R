@@ -1,10 +1,10 @@
-# Optional valence-arousal-dominance (VAD) emotion map, based on an imported
-# NRC VAD v2 lexicon (Mohammad, 2025).
+# Optional valence-arousal-dominance (VAD) emotion map, based on the NRC VAD
+# v2 lexicon (Mohammad, 2025) saved in the journal snapshot.
 
 .review_base_vad <- function(matches, stage, limits, colour = "#76559A") {
     x <- dplyr::filter(matches, .data$stage == .env$stage, is.finite(valence), is.finite(arousal), is.finite(dominance))
     if (!nrow(x)) {
-        return(plotly::layout(plotly::plot_ly(), annotations = list(list(text = "No matched emotion labels for this stage. Import NRC VAD v2 under Settings.", 
+        return(plotly::layout(plotly::plot_ly(), annotations = list(list(text = "No matched emotion labels for this stage.", 
             x = 0.5, y = 0.5, xref = "paper", yref = "paper", showarrow = FALSE))))
     }
     safe_labels <- htmltools::htmlEscape(x$label)
@@ -15,29 +15,6 @@
             opacity = 0.8)), scene = list(xaxis = list(title = "Valence: unpleasant \u2192 pleasant", range = limits), 
         yaxis = list(title = "Arousal", range = limits), zaxis = list(title = "Dominance: low \u2192 high control", 
             range = limits), aspectmode = "cube"), margin = list(l = 0, r = 0, b = 0, t = 15))
-}
-
-review_import_vad <- function(path, limits) {
-    x <- readr::read_csv(path, col_types = readr::cols(.default = readr::col_character()), show_col_types = FALSE)
-    names(x) <- stringr::str_to_lower(stringr::str_trim(names(x)))
-    needed <- c("term", "valence", "arousal", "dominance")
-    if (!all(needed %in% names(x))) 
-        stop("Prepare a CSV with columns: term,valence,arousal,dominance. Follow the lexicon documentation for the correct source columns.")
-    if (anyNA(x[needed])) 
-        stop("VAD table contains missing values.")
-    x$term <- stringr::str_to_lower(stringr::str_squish(x$term))
-    if (any(!nzchar(x$term))) 
-        stop("Empty VAD terms.")
-    for (column in needed[-1]) {
-        value <- suppressWarnings(as.numeric(x[[column]]))
-        if (any(!is.finite(value) | value < limits[1] | value > limits[2])) 
-            stop("Invalid or out-of-range ", column, " scores. Check the documented scale.")
-        x[[column]] <- value
-    }
-    x <- dplyr::distinct(dplyr::select(x, dplyr::all_of(needed)))
-    if (anyDuplicated(x$term)) 
-        stop("Conflicting duplicate VAD terms; resolve them before import.")
-    x
 }
 
 review_vad_matches <- function(reviews, vad) {

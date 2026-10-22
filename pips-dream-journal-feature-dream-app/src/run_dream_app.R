@@ -25,7 +25,7 @@ dream_app <- function(journal_path = "data/dream_journal.csv",
   }
   state <- review_read_state(state_path, journal_path)
   if (!nrow(state$vad)) {
-    warning("No VAD lexicon is saved in this snapshot. Import it under Settings / export.",
+    warning("No VAD lexicon is saved in this snapshot, so the emotion map stays empty.",
             call. = FALSE)
   }
 

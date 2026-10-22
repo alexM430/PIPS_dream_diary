@@ -43,13 +43,6 @@ test_that("VAD uses complete labels and excludes unmatched terms only from scori
     x <- review_vad_matches(r, vad)
     expect_equal(nrow(x), 2L)
     expect_true(is.na(x$valence[x$label == "very happy"]))
-    file <- tempfile(fileext = ".csv")
-    on.exit(unlink(file), add = TRUE)
-    readr::write_csv(vad, file)
-    expect_equal(nrow(review_import_vad(file, c(-1, 1))), 1L)
-    vad$dominance <- 5
-    readr::write_csv(vad, file)
-    expect_error(review_import_vad(file, c(-1, 1)))
 })
 
 test_that("snapshot round-trip preserves original journal fields", {

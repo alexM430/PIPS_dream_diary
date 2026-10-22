@@ -136,3 +136,46 @@ textarea.form-control { line-height: 1.6; }
 
 /* Overview bubbles fit five in a row on a laptop screen. */
 .sleep-bubbles.dream-overview { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 18px; }
+
+/* ---- Dream themes tab: period picker and theme clouds ------------------- */
+.theme-period { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.theme-period .form-group { margin-bottom: 0; }
+
+.theme-sky {
+  background:
+    radial-gradient(circle at 10% 20%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 85% 15%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 60% 85%, #fff 0 1.5px, transparent 2.5px),
+    linear-gradient(180deg, var(--dream-sky-1), var(--dream-sky-2)) !important;
+}
+.theme-clouds { display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 8px 18px; padding: 36px 8px 8px; min-height: 260px; }
+
+/* A cloud: a rounded body plus two puffs on top (::before and ::after). */
+.theme-cloud {
+  --cloud-fill: color-mix(in srgb, var(--cloud-colour) 72%, white);
+  position: relative; width: var(--cloud-size); height: calc(var(--cloud-size) * 0.42);
+  margin-top: calc(var(--cloud-size) * 0.22);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--cloud-fill); border-radius: 999px; cursor: pointer;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .09));
+  animation: theme-cloud-bob 6s ease-in-out infinite; animation-delay: var(--cloud-delay);
+  transition: filter .2s ease;
+}
+.theme-cloud::before, .theme-cloud::after {
+  content: ""; position: absolute; background: var(--cloud-fill); border-radius: 50%; }
+.theme-cloud::before { width: 46%; height: 118%; left: 13%; top: -58%; }
+.theme-cloud::after { width: 34%; height: 88%; left: 50%; top: -38%; }
+.theme-cloud:hover { filter: drop-shadow(0 12px 20px rgba(0, 0, 0, .16)) brightness(1.04); }
+.theme-cloud.is-selected { filter: drop-shadow(0 0 3px var(--dream-accent-1)) drop-shadow(0 0 10px var(--dream-accent-1)); }
+.theme-cloud-label, .theme-cloud-count { position: relative; z-index: 1; max-width: 92%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dream-ink); }
+.theme-cloud-label { font-weight: 700; font-size: clamp(.8rem, calc(var(--cloud-size) * 0.085), 1.6rem);
+  line-height: 1.1; margin-top: calc(var(--cloud-size) * -0.06); }
+.theme-cloud-count { font-size: clamp(.68rem, calc(var(--cloud-size) * 0.05), .95rem); opacity: .75; }
+
+@keyframes theme-cloud-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) { .theme-cloud { animation: none; } }
