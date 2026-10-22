@@ -8,454 +8,309 @@
 #'   save is written here.
 #' @param lexicon_dir Folder with the word lists.
 #' @return A Shiny server function.
-dream_app_server <- function(journal_path, state_path, lexicon_dir) {
-    dictionaries <- review_entity_dictionaries(lexicon_dir)
-    function(input, output, session) {
-        # Colour theme (Farah): runs once when the input arrives, and again
-        # whenever it changes.
-        shiny::observeEvent(input$app_colour_theme, {
-            # Ignore unexpected values rather than trying to use an invalid preset.
-            shiny::req(input$app_colour_theme %in% names(dream_themes))
-            colours <- dream_themes[[input$app_colour_theme]]
-            # Preserve the existing Bootstrap theme and update its colours.
-            # (There is no theme yet when the page has not been sent.)
-            current_theme <- session$getCurrentTheme()
-            shiny::req(current_theme)
-            updated_theme <- bslib::bs_theme_update(current_theme,
-                primary = colours$primary, bg = colours$bg, fg = colours$fg)
-            # Send the updated theme to this user's browser.
-            session$setCurrentTheme(updated_theme)
-        })
-        # Chart colours follow the selected colour theme.
-        theme_name <- shiny::reactive(input$app_colour_theme %||% "lavender")
-        state <- shiny::reactiveVal(review_read_state(state_path, journal_path))
-        editing <- shiny::reactiveVal(NULL)
-        notify_error <- function(e) shiny::showNotification(conditionMessage(e), type = "error", duration = 8)
-        persist <- function(s) {
-            review_write_state(s, state_path)
-            state(s)
-        }
-        journal <- shiny::reactive(state()$journal)
-        reviews <- shiny::reactive(state()$reviews)
-        in_period <- shiny::reactive({
-            shiny::req(input$r_period)
-            dplyr::filter(journal(), date >= input$r_period[1], date <= input$r_period[2])
-        })
-        in_reviews <- shiny::reactive(dplyr::filter(reviews(), date %in% in_period()$date))
-        top_labels <- function(x) {
-            if (identical(input$r_top, "all")) 
-                return(x)
-            utils::head(x, as.integer(input$r_top %||% "10"))
-        }
-        fill_tags <- function(id, values, choices = values) {
-            shiny::updateSelectizeInput(session, id, choices = unique(c(choices, values)), selected = values)
-        }
-        clear_form <- function() {
-            editing(NULL)
-            shiny::updateTextAreaInput(session, "r_text", value = "")
-            shiny::updateTextAreaInput(session, "r_note", value = "")
-            for (id in c("r_codes", "r_during", "r_after", "r_people", "r_animals", "r_objects")) fill_tags(id, 
-                character())
-            shiny::updateSelectInput(session, "r_during_status", selected = "unanswered")
-            shiny::updateSelectInput(session, "r_after_status", selected = "unanswered")
-            shiny::updateCheckboxInput(session, "r_entities_confirmed", value = FALSE)
-        }
-        shiny::observeEvent(TRUE, {
-            dates <- journal()$date
-            first <- if (length(dates)) 
-                min(dates)
-            else Sys.Date() - 30
-            last <- if (length(dates)) 
-                max(dates)
-            else Sys.Date()
-            shiny::updateDateRangeInput(session, "r_period", start = first, end = last)
-            shiny::updateDateInput(session, "r_date", value = last + 1)
-            shiny::updateDateInput(session, "r_cal_date", value = last)
-        }, once = TRUE)
-        shiny::observe({
-            s <- state()
-            choices <- list(r_codes = unique(c(review_unpack(s$reviews$codes), s$definitions$code)), 
-                r_during = review_unpack(c(s$reviews$during, s$reviews$after)), r_after = review_unpack(c(s$reviews$during, 
-                  s$reviews$after)), r_people = unique(c(review_unpack(s$reviews$people), s$names$person)), 
-                r_animals = review_unpack(s$reviews$animals), r_objects = review_unpack(s$reviews$objects))
-            for (id in names(choices)) {
-                selected <- shiny::isolate(input[[id]])
-                fill_tags(id, selected, choices[[id]])
-            }
-            support <- shiny::isolate(input$r_support_code)
-            if (!length(support) || !nzchar(support) || !support %in% choices$r_codes) {
-                support <- dplyr::pull(dplyr::count(review_long(s$reviews, "codes"), label, sort = TRUE), label)[1]
-            }
-            shiny::updateSelectInput(session, "r_support_code", choices = choices$r_codes, selected = support)
-            shiny::updateSelectizeInput(session, "r_definition_code", choices = choices$r_codes, selected = shiny::isolate(input$r_definition_code))
-            shiny::updateSelectInput(session, "r_forget_alias", choices = s$names$alias)
-        })
-        shiny::observe({
-            choices <- if (identical(input$r_rename_kind, "emotion")) 
-                review_unpack(c(reviews()$during, reviews()$after))
-            else review_unpack(reviews()$codes)
-            shiny::updateSelectInput(session, "r_rename_from", choices = choices)
-        })
-        shiny::observeEvent(input$r_definition_code, {
-            row <- dplyr::filter(state()$definitions, code == input$r_definition_code)
-            shiny::updateTextAreaInput(session, "r_definition", value = if (nrow(row)) 
-                row$definition[1]
-            else "")
-        })
-        shiny::observeEvent(input$r_clear, clear_form())
-        shiny::observeEvent(input$r_load, {
-            date <- as.Date(input$r_date)
-            j <- dplyr::filter(journal(), .data$date == .env$date)
-            r <- dplyr::filter(reviews(), .data$date == .env$date)
-            if (!nrow(j)) {
-                shiny::showNotification("No saved entry on this date. Clear the form to write a new one.")
-                return()
-            }
-            editing(date)
-            shiny::updateTextInput(session, "r_bed", value = j$bedtime)
-            shiny::updateTextInput(session, "r_wake", value = j$wake_time)
-            shiny::updateSliderInput(session, "r_quality", value = j$sleep_quality)
-            shiny::updateSliderInput(session, "r_stress", value = j$stress)
-            shiny::updateTextAreaInput(session, "r_text", value = j$dream_text)
-            shiny::updateTextAreaInput(session, "r_note", value = r$note)
-            for (column in c("codes", "during", "after", "people", "animals", "objects")) fill_tags(paste0("r_", 
-                column), review_unpack(r[[column]]))
-            shiny::updateSelectInput(session, "r_during_status", selected = r$during_status)
-            shiny::updateSelectInput(session, "r_after_status", selected = r$after_status)
-            shiny::updateCheckboxInput(session, "r_entities_confirmed", value = r$entities_reviewed)
-        })
-        output$r_edit_notice <- shiny::renderUI({
-            date <- as.Date(input$r_date)
-            if (!is.null(editing())) {
-                j <- dplyr::filter(journal(), .data$date == editing())
-                shiny::tagList(shiny::p("Editing saved night: ", as.character(editing())), if (nzchar(j$emotions)) 
-                  shiny::p("Legacy emotion tags (timing unspecified): ", j$emotions, ". Assign stages yourself if known."))
-            }
-            else if (date %in% journal()$date) 
-                shiny::p("This night already exists. Load it before editing; saving an unloaded existing night is blocked.")
-        })
-        shiny::observeEvent(input$r_detect, {
-            tryCatch({
-                suggestions <- review_suggest_entities(input$r_text, dictionaries, state()$names)
-                for (column in names(suggestions)) {
-                  id <- paste0("r_", column)
-                  fill_tags(id, unique(c(shiny::isolate(input[[id]]), suggestions[[column]])))
-                }
-                shiny::updateCheckboxInput(session, "r_entities_confirmed", value = FALSE)
-                shiny::showNotification("Suggestions added. Correct the lists, then confirm you reviewed them.")
-            }, error = notify_error)
-        })
-        output$r_word_count <- shiny::renderText({
-            words <- length(strsplit(stringr::str_squish(input$r_text %||% ""), " ")[[1]])
-            if (!nzchar(stringr::str_squish(input$r_text %||% ""))) "" else
-                sprintf("%d word%s", words, if (words == 1) "" else "s")
-        })
-        for (stage in c("during", "after")) local({
-            id <- paste0("r_", stage)
-            status_id <- paste0("r_", stage, "_status")
-            shiny::observeEvent(input[[id]], {
-                if (length(input[[id]]) && !identical(input[[status_id]], "reported"))
-                    shiny::updateSelectInput(session, status_id, selected = "reported")
-            }, ignoreNULL = TRUE)
-        })
-        shiny::observeEvent(input$r_text, {
-            shiny::updateCheckboxInput(session, "r_entities_confirmed", value = FALSE)
-        }, ignoreInit = TRUE)
-        shiny::observeEvent(input$r_save, {
-            tryCatch({
-                date <- as.Date(input$r_date)
-                if (date %in% journal()$date && (is.null(editing()) || date != editing())) 
-                  stop("Load the existing night before editing it.")
-                if (!is.null(editing()) && date != editing()) 
-                  stop("Keep the loaded entry's date, or clear the form to start a new night.")
-                during <- review_validate_emotions(input$r_during_status, input$r_during)
-                after <- review_validate_emotions(input$r_after_status, input$r_after)
-                codes <- review_normalise(input$r_codes)
-                s <- state()
-                old <- dplyr::filter(s$journal, .data$date == .env$date)
-                legacy <- if (nrow(old)) 
-                  review_unpack(old$emotions)
-                else character()
-                entry <- new_entry(date, input$r_bed, input$r_wake, input$r_quality, input$r_stress, 
-                  input$r_text, codes, legacy)
-                row <- review_row(date, codes)
-                row$note <- input$r_note %||% ""
-                row$during <- review_pack(during)
-                row$after <- review_pack(after)
-                row$during_status <- input$r_during_status
-                row$after_status <- input$r_after_status
-                row$people <- review_pack(input$r_people)
-                row$animals <- review_pack(input$r_animals)
-                row$objects <- review_pack(input$r_objects)
-                row$entities_reviewed <- isTRUE(input$r_entities_confirmed)
-                s$journal <- upsert_entry(s$journal, entry)
-                s$reviews <- dplyr::arrange(dplyr::bind_rows(dplyr::filter(s$reviews, .data$date != .env$date), 
-                  row), date)
-                persist(s)
-                if (date < input$r_period[1] || date > input$r_period[2]) 
-                  shiny::updateDateRangeInput(session, "r_period", start = min(date, input$r_period[1]), 
-                    end = max(date, input$r_period[2]))
-                clear_form()
-                shiny::updateDateInput(session, "r_date", value = date + 1)
-                shiny::showNotification("Entry and reviewed labels saved.")
-            }, error = notify_error)
-        })
-        output$r_recent <- shiny::renderTable({
-            dplyr::transmute(utils::head(dplyr::arrange(journal(), dplyr::desc(date)), 8),
-                Night = format(date, "%a %d %b"), Sleep = sprintf("%.1f h", sleep_hours),
-                Quality = sleep_quality, Stress = stress, Themes = gsub(";", ", ", themes))
-        })
-        output$r_theme_overview <- shiny::renderUI(theme_overview(in_period(), in_reviews()))
-        output$r_heatmap <- shiny::renderPlot(review_heatmap(in_period(), in_reviews(), input$r_bin,
-            top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
-        output$r_code_stress <- shiny::renderPlot(review_stress_plot(in_period(), in_reviews(),
-            top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
-        output$r_support <- shiny::renderUI({
-            shiny::req(input$r_support_code)
-            dates <- dplyr::pull(dplyr::filter(review_long(in_reviews(), "codes"), label == input$r_support_code),
-                date)
-            x <- dplyr::left_join(dplyr::filter(in_period(), date %in% dates),
-                                  dplyr::select(in_reviews(), date, note), by = "date")
-            x <- dplyr::arrange(x, dplyr::desc(date))
-            if (!nrow(x)) return(shiny::p(class = "dream-hint", "No dreams with this theme in the chosen dates."))
-            shiny::tagList(lapply(seq_len(nrow(x)), function(i) {
-                shiny::div(class = "dream-result",
-                    shiny::div(class = "dream-result-date", format(x$date[i], "%A %d %B")),
-                    shiny::div(class = "dream-result-text", x$dream_text[i]),
-                    if (nzchar(x$note[i] %||% "")) shiny::div(class = "dream-hint", "\U0001F4DD ", x$note[i]))
-            }))
-        })
-        counts <- shiny::reactive(review_emotion_counts(in_reviews()))
-        emotion_order <- shiny::reactive({
-            top_labels(dplyr::pull(dplyr::arrange(dplyr::summarise(dplyr::group_by(counts(), label), 
-                total = sum(nights), .groups = "drop"), dplyr::desc(total), label), label))
-        })
-        output$r_emotion_overview <- shiny::renderUI(emotion_overview(in_reviews()))
-        output$r_butterfly <- shiny::renderPlot(plot_emotion_butterfly(counts(), emotion_order(),
-            theme = theme_name()), res = 96, bg = "transparent")
-        output$r_during_summary <- shiny::renderText(review_status_summary(in_reviews(), "during"))
-        output$r_after_summary <- shiny::renderText(review_status_summary(in_reviews(), "after"))
-        matches <- shiny::reactive(review_vad_matches(in_reviews(), state()$vad))
-        output$r_vad <- plotly::renderPlotly(review_vad_plot(matches(), input$r_vad_stage, state()$vad_limits,
-            colour = get_dream_theme(theme_name())$accent[1]))
-        output$r_coverage <- shiny::renderText({
-            x <- dplyr::filter(matches(), stage == input$r_vad_stage)
-            if (!nrow(state()$vad)) 
-                return("VAD is optional and has not been imported. Emotion frequency charts do not require it. Import a documented NRC VAD v2 CSV under Settings / export to enable the 3D plot.")
-            sprintf("%d / %d distinct labels matched; %d / %d label-night occurrences matched. Source: %s. Scale: %g to %g.", 
-                sum(is.finite(x$valence)), nrow(x), sum(x$nights[is.finite(x$valence)]), sum(x$nights), 
-                state()$vad_source, state()$vad_limits[1], state()$vad_limits[2])
-        })
-        output$r_unmatched <- shiny::renderTable({
-            x <- dplyr::transmute(dplyr::filter(matches(), stage == input$r_vad_stage, !is.finite(valence)),
-                `Feeling not in the lexicon` = label, Nights = nights)
-            if (nrow(x)) x else NULL
-        })
-        entity_reviews <- shiny::reactive(dplyr::filter(in_reviews(), entities_reviewed))
-        output$r_entity_overview <- shiny::renderUI(entity_overview(entity_reviews(), nrow(in_period())))
-        output$r_entity_summary <- shiny::renderText(sprintf("Charts use %d confirmed nights out of %d logged nights. Each label counts once per night; confirm the lists in the New dream tab. In the demo, confirmations are synthetic.",
-            nrow(entity_reviews()), nrow(in_period())))
-        for (column in c("people", "animals", "objects")) local({
-            kind <- column
-            # Plain titles: the chart font cannot draw emoji.
-            title <- c(people = "People", animals = "Animals", objects = "Objects")[[kind]]
-            output[[paste0("r_", kind, "_plot")]] <- shiny::renderPlot({
-                x <- dplyr::count(review_long(entity_reviews(), kind), label, name = "nights")
-                order <- top_labels(dplyr::pull(dplyr::arrange(x, dplyr::desc(nights), label), label))
-                review_frequency_plot(x, title, order = order, theme = theme_name())
-            }, res = 96, bg = "transparent")
-        })
-        display_meta <- shiny::reactive({
-            codes <- review_unpack(reviews()$codes)
-            list(theme_meta = tibble::tibble(theme = codes, label = codes,
-                colour = unname(label_colours(codes, theme_name()))),
-                emotion_meta = tibble::tibble(emotion = character(), label = character(), emoji = character(), 
-                  valence = double(), arousal = double()))
-        })
-        display_journal <- shiny::reactive({
-            j <- journal()
-            j$emotions <- rep("", nrow(j))
-            j$valence <- rep(NA_real_, nrow(j))
-            j$arousal <- rep(NA_real_, nrow(j))
-            j
-        })
-        shiny::observeEvent(input$r_cal_click, shiny::updateDateInput(session, "r_cal_date", value = as.Date(input$r_cal_click)))
-        cal_entries <- shiny::reactive({
-            range <- calendar_range(input$r_cal_date, input$r_cal_view)
-            dplyr::filter(display_journal(), date >= range[1], date <= range[2])
-        })
-        shiny::observeEvent(input$r_cal_prev, shiny::updateDateInput(session, "r_cal_date",
-            value = shift_calendar_date(input$r_cal_date, input$r_cal_view, -1)))
-        shiny::observeEvent(input$r_cal_next, shiny::updateDateInput(session, "r_cal_date",
-            value = shift_calendar_date(input$r_cal_date, input$r_cal_view, 1)))
-        output$r_cal_title <- shiny::renderText({
-            shiny::req(input$r_cal_date)
-            calendar_title(input$r_cal_date, input$r_cal_view)
-        })
-        output$r_cal_summary <- shiny::renderUI(calendar_stats(cal_entries()))
-        output$r_cal_grid <- shiny::renderUI({
-            range <- calendar_range(input$r_cal_date, input$r_cal_view)
-            dream_calendar(display_journal(), range[1], range[2], input$r_cal_fill, as.Date(input$r_cal_date),
-                display_meta(), click_input = "r_cal_click", theme = theme_name())
-        })
-        output$r_cal_night <- shiny::renderUI({
-            date <- as.Date(input$r_cal_date)
-            r <- dplyr::filter(reviews(), .data$date == .env$date)
-            shiny::tagList(dream_night_card(dplyr::filter(display_journal(), .data$date == .env$date),
-                date, display_meta()), if (nrow(r)) review_night_details(r))
-        })
-        sleep_nights <- shiny::reactive(last_nights(display_journal(), as.numeric(input$r_sleep_window)))
-        output$r_sleep_ring <- shiny::renderUI({
-            summary <- sleep_summary(sleep_nights())
-            if (is.null(summary)) 
-                shiny::p("No nights logged.")
-            else sleep_ring(summary$avg_hours)
-        })
-        output$r_sleep_bubbles <- shiny::renderUI({
-            summary <- sleep_summary(sleep_nights())
-            if (!is.null(summary)) {
-                # Feelings live in the reviews (while dreaming), not in the journal.
-                nights_reviews <- dplyr::filter(reviews(), date %in% sleep_nights()$date,
-                                                during_status == "reported")
-                feelings <- review_long(nights_reviews, "during")
-                summary$top_emotion <- if (nrow(feelings))
-                    dplyr::pull(dplyr::count(feelings, label, sort = TRUE), label)[1] else NA_character_
-                sleep_stat_bubbles(summary, display_meta())
-            }
-        })
-        output$r_sleep_hours <- shiny::renderPlot(plot_sleep_hours(sleep_nights(), theme = theme_name()), res = 96,
-                                                  bg = "transparent")
-        output$r_sleep_windows <- shiny::renderPlot(plot_sleep_windows(sleep_nights(), theme = theme_name()), res = 96,
-                                                    bg = "transparent")
-        output$r_recommendations <- shiny::renderUI({
-            n <- as.numeric(input$r_sleep_window)
-            if (n == 0) 
-                n <- if (nrow(journal())) 
-                  as.numeric(max(journal()$date) - min(journal()$date)) + 1
-                else 14
-            recommendation_cards(sleep_recommendations(display_journal(), display_meta()$emotion_meta, 
-                window_days = n))
-        })
-        # The shareable story picture, made once per change of nights.
-        story_file <- shiny::reactive({
-            shiny::req(nrow(sleep_nights()) > 0)
-            save_story_card(tempfile(fileext = ".png"), sleep_nights(), display_meta())
-        })
-        output$r_story_preview <- shiny::renderImage({
-            list(src = story_file(), contentType = "image/png",
-                 alt = "Preview of your shareable dream stats picture")
-        }, deleteFile = FALSE)
-        output$r_story <- shiny::downloadHandler(filename = function() paste0("my-dream-stats-", Sys.Date(),
-            ".png"), content = function(file) file.copy(story_file(), file), contentType = "image/png")
-        output$r_search_results <- shiny::renderUI({
-            query <- stringr::str_trim(input$r_search %||% "")
-            if (!nzchar(query))
-                return(shiny::p(class = "dream-hint", "Type a word to search all your dreams."))
-            x <- dplyr::left_join(journal(), reviews(), by = "date")
-            columns <- c("dream_text", "codes", "during", "after", "people", "animals", "objects", "note")
-            found <- rep(FALSE, nrow(x))
-            for (column in columns) found <- found | stringr::str_detect(x[[column]], stringr::fixed(query, 
-                ignore_case = TRUE))
-            x <- dplyr::arrange(x[found, ], dplyr::desc(date))
-            chips <- function(values, prefix) {
-                lapply(review_unpack(values), function(v) shiny::span(class = "dream-chip is-soft", prefix, v))
-            }
-            shiny::tagList(shiny::p(class = "dream-hint", nrow(x), if (nrow(x) == 1) "dream found" else "dreams found"),
-                lapply(seq_len(nrow(x)), function(i) {
-                    shiny::div(class = "dream-result",
-                        shiny::div(class = "dream-result-date", format(x$date[i], "%A %d %B %Y")),
-                        shiny::div(class = "dream-result-text", x$dream_text[i]),
-                        shiny::div(class = "dream-chips",
-                            chips(x$codes[i], "\U0001F3F7\uFE0F "), chips(x$during[i], "\U0001F4AD "),
-                            chips(x$after[i], "\u2600\uFE0F "), chips(x$people[i], "\U0001F9D1 "),
-                            chips(x$animals[i], "\U0001F43E "), chips(x$objects[i], "\U0001F511 ")))
-                }))
-        })
-        shiny::observeEvent(input$r_define, tryCatch({
-            code <- review_normalise(input$r_definition_code)
-            if (length(code) != 1) 
-                stop("Enter one code.")
-            s <- state()
-            s$definitions <- dplyr::bind_rows(dplyr::filter(s$definitions, .data$code != .env$code), 
-                tibble::tibble(code = code, definition = input$r_definition %||% ""))
-            persist(s)
-        }, error = notify_error))
-        output$r_definitions <- shiny::renderTable(state()$definitions)
-        shiny::observeEvent(input$r_rename, tryCatch({
-            if (!isTRUE(input$r_rename_confirm)) 
-                stop("Confirm the global rename first.")
-            from <- review_normalise(input$r_rename_from)
-            to <- review_normalise(input$r_rename_to)
-            if (length(from) != 1 || length(to) != 1) 
-                stop("Choose one existing label and one replacement.")
-            if (identical(from, to)) 
-                stop("The replacement is unchanged.")
-            s <- state()
-            columns <- if (input$r_rename_kind == "emotion") 
-                c("during", "after")
-            else "codes"
-            for (column in columns) s$reviews[[column]] <- vapply(s$reviews[[column]], function(value) {
-                labels <- review_unpack(value)
-                labels[labels == from] <- to
-                review_pack(labels)
-            }, character(1))
-            if (identical(columns, "codes")) {
-                s$journal$themes <- s$reviews$codes[match(s$journal$date, s$reviews$date)]
-                old_definition <- dplyr::filter(s$definitions, code == from)
-                if (!to %in% s$definitions$code && nrow(old_definition)) {
-                  old_definition$code <- to
-                  s$definitions <- dplyr::bind_rows(s$definitions, old_definition)
-                }
-                s$definitions <- dplyr::filter(s$definitions, code != from)
-            }
-            persist(s)
-            shiny::updateCheckboxInput(session, "r_rename_confirm", value = FALSE)
-            shiny::showNotification("Labels renamed / merged. Reload any entry currently open before saving it.")
-            clear_form()
-        }, error = notify_error))
-        shiny::observeEvent(input$r_remember, tryCatch({
-            alias <- review_normalise(input$r_name_alias)
-            person <- review_normalise(input$r_name_person)
-            if (length(alias) != 1 || length(person) != 1) 
-                stop("Enter one alias and one person label.")
-            s <- state()
-            s$names <- dplyr::bind_rows(dplyr::filter(s$names, .data$alias != .env$alias), tibble::tibble(alias = alias, 
-                person = person))
-            persist(s)
-            shiny::showNotification("Name remembered for future suggestions.")
-        }, error = notify_error))
-        output$r_names <- shiny::renderTable(state()$names)
-        shiny::observeEvent(input$r_forget, tryCatch({
-            s <- state()
-            s$names <- dplyr::filter(s$names, alias != input$r_forget_alias)
-            persist(s)
-        }, error = notify_error))
-        shiny::observeEvent(input$r_import_vad, tryCatch({
-            shiny::req(input$r_vad_file)
-            if (!isTRUE(input$r_vad_confirm)) 
-                stop("Check the version, score scale, column mapping and usage terms first.")
-            source <- stringr::str_squish(input$r_vad_source)
-            if (!nzchar(source)) 
-                stop("Provide a source citation.")
-            limits <- if (input$r_vad_scale == "signed") 
-                c(-1, 1)
-            else c(0, 1)
-            vad <- review_import_vad(input$r_vad_file$datapath, limits)
-            s <- state()
-            s$vad <- vad
-            s$vad_limits <- limits
-            s$vad_source <- source
-            s$vad_version <- "v2 (user-confirmed)"
-            persist(s)
-            shiny::showNotification(sprintf("Imported %d VAD terms.", nrow(vad)))
-        }, error = notify_error))
-        output$r_vad_info <- shiny::renderText(sprintf("%d terms stored locally. %s \u00B7 %s", nrow(state()$vad), 
-            state()$vad_version, state()$vad_source))
-        output$r_export <- shiny::downloadHandler(filename = function() paste0("reviewed-journal-", Sys.Date(), 
-            ".csv"), content = function(file) {
-            readr::write_csv(dplyr::left_join(journal(), reviews(), by = "date"), file)
-        })
-        output$r_snapshot <- shiny::downloadHandler(filename = function() paste0("reviewed-journal-", 
-            Sys.Date(), ".rds"), content = function(file) saveRDS(state(), file))
+dream_app_server <- function(journal_path, lexicons) {
+  function(input, output, session) {
+    # Create one simulated diary per session, not on every toggle change.
+    demo_journal <- simulate_dream_journal()
+    
+    # Use the simulated table's columns/types as the empty-journal template.
+    # No simulated rows are copied into the personal journal.
+    initial_personal <- if (file.exists(journal_path)) {
+      read_journal(journal_path)
+    } else {
+      demo_journal[0, , drop = FALSE]
     }
+    
+    personal_journal <- shiny::reactiveVal(initial_personal)
+    
+    # Existing charts/search already read journal(), so they automatically
+    # switch datasets without rewriting each individual output.
+    journal <- shiny::reactive({
+      if (isTRUE(input$demo_mode)) {
+        demo_journal
+      } else {
+        personal_journal()
+      }
+    })
+    
+    scored <- shiny::reactive({
+      add_affect_scores(journal(), lexicons$emotion_meta)
+    })
+    
+    output$data_mode_status <- shiny::renderUI({
+      if (isTRUE(input$demo_mode)) {
+        shiny::helpText(
+          "Demo: this is a simulated diary, not your personal data. ",
+          "Switch Demo mode off to enter and analyse your own diary."
+        )
+      } else {
+        shiny::helpText(
+          "Self-Analysis: entries and results use your personal diary."
+        )
+      }
+    })
+    
+    output$save_entry_control <- shiny::renderUI({
+      if (isTRUE(input$demo_mode)) {
+        shiny::tagList(
+          shiny::tags$button(
+            type = "button",
+            class = "btn btn-primary",
+            disabled = "disabled",
+            "Save unavailable in Demo mode"
+          ),
+          shiny::helpText("Switch Demo mode off before saving an entry.")
+        )
+      } else {
+        shiny::actionButton(
+          "save", "Save entry",
+          icon = shiny::icon("floppy-disk"),
+          class = "btn-primary"
+        )
+      }
+    })
+
+    # Reset dates at startup and whenever the user changes data mode.
+    # Otherwise the personal diary could inherit the demo's date filters.
+    shiny::observeEvent(input$demo_mode, {
+      dates <- journal()$date
+      dates <- dates[!is.na(dates)]
+      
+      last <- if (length(dates) > 0) max(dates) else Sys.Date()
+      first <- if (length(dates) > 0) min(dates) else Sys.Date() - 30
+      next_entry <- if (length(dates) > 0) last + 1 else Sys.Date()
+      
+      shiny::updateDateRangeInput(
+        session, "period", start = first, end = last
+      )
+      shiny::updateDateInput(session, "cal_date", value = last)
+      shiny::updateDateInput(session, "entry_date", value = next_entry)
+    }, ignoreNULL = FALSE)
+
+    in_period <- reactive({
+      req(input$period)
+      filter(scored(), date >= input$period[1], date <= input$period[2])
+    })
+
+    # New entry -----------------------------------------------------------
+    observeEvent(input$detect, {
+      themes <- detect_categories(input$entry_text, lexicons$themes)
+      emotions <- detect_categories(input$entry_text, lexicons$emotions)
+      updateCheckboxGroupInput(session, "entry_themes", selected = themes)
+      updateCheckboxGroupInput(session, "entry_emotions", selected = emotions)
+      if (length(themes) + length(emotions) == 0) {
+        showNotification("No known theme or emotion words found. Tick them yourself.",
+                         type = "warning")
+      }
+    })
+
+    shiny::observeEvent(input$save, {
+      # Guard the write operation even if a stale/manual event is received.
+      if (isTRUE(input$demo_mode)) {
+        shiny::showNotification(
+          "Demo data is read-only. Switch Demo mode off to save your entry.",
+          type = "warning"
+        )
+        return()
+      }
+      
+      entry <- tryCatch(
+        new_entry(
+          input$entry_date, input$entry_bedtime, input$entry_wake,
+          input$entry_quality, input$entry_stress, input$entry_text,
+          input$entry_themes, input$entry_emotions
+        ),
+        error = function(e) {
+          shiny::showNotification(conditionMessage(e), type = "error")
+          NULL
+        }
+      )
+      shiny::req(entry)
+      
+      # Always save to the personal dataset, never the displayed demo.
+      replaced <- entry$date %in% personal_journal()$date
+      updated_personal <- upsert_entry(personal_journal(), entry)
+      
+      # Ensure the destination folder exists before writing the CSV.
+      dir.create(dirname(journal_path), recursive = TRUE, showWarnings = FALSE)
+      
+      # Report write errors without claiming the entry was saved.
+      saved <- tryCatch({
+        write_journal(updated_personal, journal_path)
+        TRUE
+      }, error = function(e) {
+        shiny::showNotification(
+          paste("Could not save your diary:", conditionMessage(e)),
+          type = "error"
+        )
+        FALSE
+      })
+      shiny::req(saved)
+      personal_journal(updated_personal)
+      
+      shiny::showNotification(
+        if (replaced) "Entry updated." else "Entry saved.",
+        type = "message"
+      )
+      
+      if (!is.null(input$period) && length(input$period) == 2) {
+        if (entry$date > input$period[2] || entry$date < input$period[1]) {
+          shiny::updateDateRangeInput(
+            session, "period",
+            start = min(input$period[1], entry$date),
+            end = max(input$period[2], entry$date)
+          )
+        }
+      }
+      
+      shiny::updateDateInput(session, "entry_date", value = entry$date + 1)
+      shiny::updateTextAreaInput(session, "entry_text", value = "")
+      shiny::updateCheckboxGroupInput(
+        session, "entry_themes", selected = character()
+      )
+      shiny::updateCheckboxGroupInput(
+        session, "entry_emotions", selected = character()
+      )
+    }, ignoreInit = TRUE)
+
+    output$recent_entries <- renderTable({
+      journal() |>
+        arrange(desc(date)) |>
+        head(8) |>
+        transmute(Night = format(date, "%a %d %b"), Bed = bedtime, Up = wake_time,
+                  Hours = sleep_hours, Quality = sleep_quality, Stress = stress,
+                  Themes = str_replace_all(themes, ";", ", "),
+                  Emotions = str_replace_all(emotions, ";", ", "))
+    }, digits = 1)
+
+    # Calendar ------------------------------------------------------------
+    cal_range <- reactive({
+      req(input$cal_date)
+      day <- as.Date(input$cal_date)
+      switch(input$cal_view,
+             day = c(day, day),
+             week = floor_date(day, "week", week_start = 1) + c(0, 6),
+             month = c(floor_date(day, "month"),
+                       ceiling_date(day, "month") - 1))
+    })
+    cal_entries <- reactive({
+      filter(scored(), date >= cal_range()[1], date <= cal_range()[2])
+    })
+
+    output$cal_summary <- renderUI({
+      entries <- cal_entries()
+      boxes <- if (nrow(entries) == 0) {
+        list(value_box("Nights logged", 0))
+      } else {
+        list(
+          value_box("Nights logged", nrow(entries), showcase = icon("book")),
+          value_box("Dreams recalled", sum(entries$dream_text != ""),
+                    showcase = icon("cloud")),
+          value_box("Avg. hours slept", sprintf("%.1f", mean(entries$sleep_hours)),
+                    showcase = icon("bed")),
+          value_box("Avg. sleep quality", sprintf("%.1f / 10", mean(entries$sleep_quality)),
+                    showcase = icon("star")),
+          value_box("Avg. stress", sprintf("%.1f / 10", mean(entries$stress)),
+                    showcase = icon("bolt"))
+        )
+      }
+      do.call(layout_columns, c(list(fill = FALSE), boxes))
+    })
+
+    output$cal_plot <- renderPlot({
+      plot_calendar(scored(), cal_range()[1], cal_range()[2], input$cal_fill)
+    }, res = 96)
+
+    output$cal_entries <- renderUI({
+      entries <- cal_entries() |> arrange(desc(date))
+      if (nrow(entries) == 0) return(p(class = "text-muted", "No entries."))
+      tagList(lapply(seq_len(nrow(entries)), \(i) entry_card(entries[i, ])))
+    })
+
+    # Themes and emotions -------------------------------------------------
+    output$theme_heatmap <- renderPlot({
+      plot_theme_heatmap(in_period(), lexicons$theme_meta, input$bin)
+    }, res = 96)
+    output$theme_stress <- renderPlot({
+      plot_theme_stress(in_period(), lexicons$theme_meta)
+    }, res = 96)
+    output$affect_map <- renderPlot({
+      plot_affect_map(in_period(), lexicons$emotion_meta, input$affect_colour)
+    }, res = 96)
+    output$emotion_timeline <- renderPlot({
+      plot_emotion_timeline(in_period(), lexicons$emotion_meta, input$bin)
+    }, res = 96)
+
+    # People and objects --------------------------------------------------
+    output$people_plot <- renderPlot({
+      plot_mentions(count_mentions(in_period(), lexicons$people), input$top_n,
+                    "Recurring people", fill = "#5B4B8A")
+    }, res = 96)
+    output$objects_plot <- renderPlot({
+      plot_mentions(count_mentions(in_period(), lexicons$objects), input$top_n,
+                    "Recurring objects", fill = "#D58936")
+    }, res = 96)
+
+    # Sleep ---------------------------------------------------------------
+    output$sleep_trends <- renderPlot(plot_sleep_trends(in_period()), res = 96)
+
+    output$recommendations <- renderUI({
+      advice <- sleep_recommendations(journal(), lexicons$emotion_meta,
+                                      input$rec_window)
+      tagList(lapply(seq_len(nrow(advice)), function(i) {
+        div(class = "mb-3",
+            strong(advice$title[i]), br(), advice$message[i],
+            if (advice$source[i] != "")
+              tags$small(class = "text-muted", paste0(" (", advice$source[i], ")")))
+      }))
+    })
+
+    # Search --------------------------------------------------------------
+    output$search_results <- renderUI({
+      query <- str_trim(coalesce(input$search, ""))
+      if (query == "") return(p(class = "text-muted", "Type a word to search all entries."))
+      hits <- search_journal(scored(), query)
+      if (nrow(hits) == 0) return(p("No dreams match ", strong(query), "."))
+      tagList(
+        p(nrow(hits), if (nrow(hits) == 1) "dream matches." else "dreams match."),
+        lapply(seq_len(nrow(hits)), \(i) entry_card(hits[i, ], highlight = query))
+      )
+    })
+  }
+}
+
+#' Entries whose text, themes or emotions contain a search term.
+#'
+#' @param journal A journal tibble.
+#' @param query Search term (case-insensitive, matched literally).
+#' @return The matching rows, newest first.
+search_journal <- function(journal, query) {
+  pattern <- fixed(query, ignore_case = TRUE)
+  journal |>
+    filter(str_detect(dream_text, pattern) | str_detect(themes, pattern) |
+             str_detect(emotions, pattern)) |>
+    arrange(desc(date))
+}
+
+# A card showing one night, optionally with a search term highlighted.
+entry_card <- function(entry, highlight = NULL) {
+  text <- if (entry$dream_text == "") "No dream recalled." else entry$dream_text
+  text <- htmltools::htmlEscape(text)
+  if (!is.null(highlight)) {
+    text <- str_replace_all(
+      text, regex(str_escape(htmltools::htmlEscape(highlight)), ignore_case = TRUE),
+      "<mark>\\0</mark>")
+  }
+  tags_line <- paste(c(split_tags(entry$themes)[[1]], split_tags(entry$emotions)[[1]]),
+                     collapse = " · ")
+  div(
+    class = "border-bottom pb-2 mb-2",
+    strong(format(entry$date, "%A %d %B %Y")),
+    tags$small(class = "text-muted ms-2",
+               sprintf("%s–%s · %.1f h · quality %d · stress %d",
+                       entry$bedtime, entry$wake_time, entry$sleep_hours,
+                       entry$sleep_quality, entry$stress)),
+    p(class = "mb-1", HTML(text)),
+    if (tags_line != "") tags$small(class = "text-primary", tags_line)
+  )
 }
