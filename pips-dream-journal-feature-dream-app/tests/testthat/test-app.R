@@ -32,7 +32,7 @@ test_that("every colour preset can be selected", {
   files <- temp_app_files()
   server <- dream_app_server(files$journal, files$state, file.path(project_root, "data", "lexicons"))
   shiny::testServer(server, {
-    for (preset in names(app_colour_presets)) {
+    for (preset in names(dream_themes)) {
       expect_no_error(session$setInputs(app_colour_theme = preset))
     }
   })

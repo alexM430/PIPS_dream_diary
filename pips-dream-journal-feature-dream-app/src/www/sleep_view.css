@@ -13,7 +13,7 @@
   margin: 0;
   font-size: 1.9rem;
   font-weight: 700;
-  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -30,7 +30,7 @@
 .dream-pills input:checked + span { color: #fff;
   background: linear-gradient(90deg, var(--dream-lilac), var(--dream-pink));
   box-shadow: 0 3px 10px rgba(236, 72, 153, .25); }
-.dream-pills input:focus-visible + span { outline: 2px solid #8B5CF6; }
+.dream-pills input:focus-visible + span { outline: 2px solid var(--dream-accent-1); }
 
 /* Overview: ring + stat bubbles. */
 .sleep-overview { display: grid; grid-template-columns: 220px 1fr; gap: 20px;
@@ -40,12 +40,12 @@
 .sleep-ring { position: relative; width: 200px; height: 200px; margin: 0 auto;
   filter: drop-shadow(0 10px 24px rgba(167, 139, 250, .3)); }
 .sleep-ring svg { width: 100%; height: 100%; }
-.sleep-ring-track { fill: rgba(255, 255, 255, .75); stroke: #F1E8FF; stroke-width: 12; }
+.sleep-ring-track { fill: rgba(255, 255, 255, .75); stroke: var(--dream-sky-1); stroke-width: 12; }
 .sleep-ring-fill { fill: none; stroke: url(#sleepRingGradient); stroke-width: 12;
   stroke-linecap: round; transition: stroke-dasharray .8s ease; }
 .sleep-ring-label { position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center; }
-.sleep-ring-value { font-size: 2.2rem; font-weight: 700; color: #D946A0; line-height: 1; }
+.sleep-ring-value { font-size: 2.2rem; font-weight: 700; color: var(--dream-accent-2); line-height: 1; }
 .sleep-ring-caption { font-size: .78rem; color: var(--dream-muted); margin-top: 4px; }
 
 .sleep-bubbles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
@@ -71,7 +71,7 @@
 /* Tips. */
 .sleep-tips { display: flex; flex-direction: column; gap: 10px; }
 .sleep-tip { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px;
-  border-radius: 18px; background: linear-gradient(135deg, #FFFFFF, #FDF2F8); }
+  border-radius: 18px; background: linear-gradient(135deg, #FFFFFF, var(--dream-sky-2)); }
 .sleep-tip-emoji { font-size: 1.6rem; line-height: 1; }
 .sleep-tip-title { font-weight: 700; }
 .sleep-tip-text { font-size: .9rem; line-height: 1.45; }
@@ -87,7 +87,7 @@
 .sleep-sky .btn.dream-btn, .sleep-sky .btn.dream-btn-outline {
   border-radius: 999px; padding: 8px 18px; font-weight: 700; font-family: var(--dream-font); }
 .sleep-sky .btn.dream-btn { border: none; color: #fff;
-  background: linear-gradient(90deg, #A78BFA, #F472B6);
+  background: linear-gradient(90deg, var(--dream-lilac), var(--dream-pink));
   box-shadow: 0 4px 14px rgba(236, 72, 153, .3); }
 .sleep-sky .btn.dream-btn:hover { filter: brightness(1.05); transform: translateY(-1px); }
-.sleep-sky .btn.dream-btn-outline { background: #fff; color: #8B5CF6; border: 2px solid #E9D5FF; }
+.sleep-sky .btn.dream-btn-outline { background: #fff; color: var(--dream-accent-1); border: 2px solid var(--dream-lilac); }

@@ -13,15 +13,34 @@ calendar_palettes <- list(
                      limits = c(4, 10), low = "4 h", high = "10 h")
 )
 
+#' Colour scale for a calendar variable, optionally in a colour theme.
+#'
+#' @param fill_by Name of a palette in `calendar_palettes`.
+#' @param theme Theme name (see `dream_themes`), or NULL for the default
+#'   pastels. Valence keeps its own blue-to-pink scale in every theme.
+#' @return A palette list with `colours`, `limits`, `low` and `high`.
+calendar_palette <- function(fill_by, theme = NULL) {
+  palette <- calendar_palettes[[fill_by]]
+  if (is.null(palette)) stop("Unknown fill_by: ", fill_by, call. = FALSE)
+  if (!is.null(theme) && fill_by != "valence") {
+    t <- get_dream_theme(theme)
+    palette$colours <- switch(fill_by,
+      sleep_quality = c("#FFFFFF", t$soft[1], t$charts[1]),
+      stress = c("#FFFFFF", t$soft[2], t$charts[2]),
+      sleep_hours = c("#FFFFFF", t$sky[1], t$charts[3]))
+  }
+  palette
+}
+
 #' Pastel colour for each value of a calendar variable.
 #'
 #' @param value Numeric vector (NA allowed).
 #' @param fill_by Name of a palette in `calendar_palettes`.
+#' @param theme Theme name, or NULL for the default pastels.
 #' @return Character vector of hex colours, NA where `value` is NA. Values
 #'   outside the palette limits get the end colours.
-pastel_colour <- function(value, fill_by) {
-  palette <- calendar_palettes[[fill_by]]
-  if (is.null(palette)) stop("Unknown fill_by: ", fill_by, call. = FALSE)
+pastel_colour <- function(value, fill_by, theme = NULL) {
+  palette <- calendar_palette(fill_by, theme)
   limits <- palette$limits
   colours <- rep(NA_character_, length(value))
   known <- !is.na(value)
@@ -79,9 +98,10 @@ calendar_title <- function(day, view) {
 #' @param selected Date to highlight.
 #' @param lexicons Output of `load_lexicons()` (theme colours, emotion emoji).
 #' @param click_input Name of the Shiny input that receives clicked dates.
+#' @param theme Theme name for the tile colours, or NULL for the default pastels.
 #' @return An htmltools tag.
 dream_calendar <- function(journal, start, end, fill_by, selected, lexicons,
-                           click_input = "cal_click") {
+                           click_input = "cal_click", theme = NULL) {
   start <- as.Date(start)
   end <- as.Date(end)
   grid_start <- floor_date(start, "week", week_start = 1)
@@ -89,7 +109,7 @@ dream_calendar <- function(journal, start, end, fill_by, selected, lexicons,
 
   days <- tibble(date = seq(grid_start, grid_end, by = "day")) |>
     left_join(journal, by = "date") |>
-    mutate(fill = pastel_colour(.data[[fill_by]], fill_by))
+    mutate(fill = pastel_colour(.data[[fill_by]], fill_by, theme))
 
   weekday_names <- c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
   tiles <- lapply(seq_len(nrow(days)), function(i) {
@@ -103,7 +123,7 @@ dream_calendar <- function(journal, start, end, fill_by, selected, lexicons,
     div(class = "dream-cal-weekdays",
         lapply(weekday_names, \(name) div(class = "dream-cal-weekday", name))),
     div(class = "dream-cal-grid", tiles),
-    calendar_legend(fill_by)
+    calendar_legend(fill_by, theme)
   )
 }
 
@@ -116,6 +136,8 @@ calendar_tile <- function(night, in_range, selected, lexicons, click_input) {
 
   emoji <- if (length(emotions) > 0) {
     lexicons$emotion_meta$emoji[match(emotions[1], lexicons$emotion_meta$emotion)]
+  } else if (dreamed) {
+    "\u2601\uFE0F"  # cloud: a dream was recalled
   } else if (logged) {
     "\U0001F319"  # crescent moon: slept, no dream recalled
   } else {
@@ -151,8 +173,8 @@ calendar_tile <- function(night, in_range, selected, lexicons, click_input) {
 }
 
 # Colour key below the grid.
-calendar_legend <- function(fill_by) {
-  palette <- calendar_palettes[[fill_by]]
+calendar_legend <- function(fill_by, theme = NULL) {
+  palette <- calendar_palette(fill_by, theme)
   div(
     class = "dream-legend",
     span(palette$low),
@@ -160,7 +182,7 @@ calendar_legend <- function(fill_by) {
         style = paste0("background: linear-gradient(90deg, ",
                        paste(palette$colours, collapse = ", "), ");")),
     span(palette$high),
-    span(class = "dream-legend-note", "\U0001F319 no dream recalled"),
+    span(class = "dream-legend-note", "\u2601\uFE0F dream \u00B7 \U0001F319 no dream recalled"),
     span(class = "dream-legend-note", "dots = dream themes")
   )
 }

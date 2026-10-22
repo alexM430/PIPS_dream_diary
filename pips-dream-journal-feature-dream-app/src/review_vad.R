@@ -1,7 +1,7 @@
 # Optional valence-arousal-dominance (VAD) emotion map, based on an imported
 # NRC VAD v2 lexicon (Mohammad, 2025).
 
-.review_base_vad <- function(matches, stage, limits) {
+.review_base_vad <- function(matches, stage, limits, colour = "#76559A") {
     x <- dplyr::filter(matches, .data$stage == .env$stage, is.finite(valence), is.finite(arousal), is.finite(dominance))
     if (!nrow(x)) {
         return(plotly::layout(plotly::plot_ly(), annotations = list(list(text = "No matched emotion labels for this stage. Import NRC VAD v2 under Settings.", 
@@ -11,7 +11,7 @@
     x$hover <- sprintf("%s<br>Nights: %d<br>Valence: %.3f<br>Arousal: %.3f<br>Dominance: %.3f", safe_labels, 
         x$nights, x$valence, x$arousal, x$dominance)
     plotly::layout(plotly::plot_ly(x, x = ~valence, y = ~arousal, z = ~dominance, type = "scatter3d", 
-        mode = "markers", text = ~hover, hoverinfo = "text", size = ~nights, sizes = c(7, 22), marker = list(color = "#76559A", 
+        mode = "markers", text = ~hover, hoverinfo = "text", size = ~nights, sizes = c(7, 22), marker = list(color = colour, 
             opacity = 0.8)), scene = list(xaxis = list(title = "Valence: unpleasant \u2192 pleasant", range = limits), 
         yaxis = list(title = "Arousal", range = limits), zaxis = list(title = "Dominance: low \u2192 high control", 
             range = limits), aspectmode = "cube"), margin = list(l = 0, r = 0, b = 0, t = 15))
@@ -45,10 +45,11 @@ review_vad_matches <- function(reviews, vad) {
     dplyr::left_join(x, vad, by = c(label = "term"))
 }
 
-review_vad_plot <- function(matches, stage, limits) {
+review_vad_plot <- function(matches, stage, limits, colour = "#76559A") {
     x <- dplyr::filter(matches, .data$stage == .env$stage, is.finite(valence), is.finite(arousal), is.finite(dominance))
     if (nrow(x)) 
-        return(.review_base_vad(matches, stage, limits))
+        # No scroll-zoom, so scrolling the page never gets stuck in the 3D map.
+        return(plotly::config(.review_base_vad(matches, stage, limits, colour), scrollZoom = FALSE))
     plotly::config(plotly::layout(plotly::plot_ly(), xaxis = list(visible = FALSE, range = c(0, 1)), 
         yaxis = list(visible = FALSE, range = c(0, 1)), annotations = list(list(text = paste0("Affective-space plot unavailable.<br>", 
             "Requires reported emotions and matching terms<br>", "from an imported VAD lexicon. Frequency charts are separate."), 

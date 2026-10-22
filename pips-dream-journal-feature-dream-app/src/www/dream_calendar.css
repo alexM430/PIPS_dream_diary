@@ -1,10 +1,8 @@
 /* Dreamy pastel styling for the Calendar tab (see src/calendar_widget.R). */
 
+/* Theme colours (--dream-sky-*, --dream-accent-*, --dream-ink, ...) come
+   from dream_theme_css() in src/dream_themes.R. */
 :root {
-  --dream-ink: #4A3B5C;
-  --dream-muted: #9A8AAE;
-  --dream-lilac: #C9A7EB;
-  --dream-pink: #F7A8C8;
   --dream-card: rgba(255, 255, 255, 0.72);
   --dream-font: "Quicksand", "Nunito", system-ui, sans-serif;
 }
@@ -20,7 +18,7 @@
     radial-gradient(circle at 78% 10%, #fff 0 1px, transparent 2px),
     radial-gradient(circle at 90% 62%, #fff 0 1.5px, transparent 2.5px),
     radial-gradient(circle at 35% 85%, #fff 0 1px, transparent 2px),
-    linear-gradient(160deg, #EDE4FF 0%, #FCE7F3 55%, #FFF1E6 100%);
+    linear-gradient(160deg, var(--dream-sky-1) 0%, var(--dream-sky-2) 55%, var(--dream-sky-3) 100%);
 }
 
 /* Header: arrows, month title, view switch and colour picker. */
@@ -39,7 +37,7 @@
   margin: 0;
   min-width: 13ch;
   text-align: center;
-  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -127,7 +125,7 @@
 .dream-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #fff; }
 
 .dream-day.is-empty { background: rgba(255, 255, 255, 0.35); box-shadow: none;
-  border: 1.5px dashed rgba(201, 167, 235, 0.6); }
+  border: 1.5px dashed var(--dream-lilac); }
 .dream-day.is-outside { opacity: 0.35; }
 .dream-day.is-selected {
   outline: 3px solid #fff;
@@ -143,13 +141,13 @@
 /* Selected night card and the list below it. */
 .dream-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dream-night {
-  background: linear-gradient(160deg, rgba(255,255,255,.92), rgba(255,240,248,.92));
+  background: linear-gradient(160deg, rgba(255,255,255,.92), var(--dream-sky-2));
   border-radius: 24px; padding: 20px;
   box-shadow: 0 8px 30px rgba(236, 72, 153, 0.15);
 }
 .dream-night-date { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
 .dream-night-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.dream-night-facts span { background: #F5EDFF; border-radius: 999px; padding: 3px 10px;
+.dream-night-facts span { background: var(--dream-sky-1); border-radius: 999px; padding: 3px 10px;
   font-size: .82rem; font-weight: 600; }
 .dream-night-text { font-style: italic; line-height: 1.55; margin-bottom: 12px; }
 .dream-chips { display: flex; flex-wrap: wrap; gap: 6px; }

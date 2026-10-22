@@ -15,8 +15,8 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
         # whenever it changes.
         shiny::observeEvent(input$app_colour_theme, {
             # Ignore unexpected values rather than trying to use an invalid preset.
-            shiny::req(input$app_colour_theme %in% names(app_colour_presets))
-            colours <- app_colour_presets[[input$app_colour_theme]]
+            shiny::req(input$app_colour_theme %in% names(dream_themes))
+            colours <- dream_themes[[input$app_colour_theme]]
             # Preserve the existing Bootstrap theme and update its colours.
             # (There is no theme yet when the page has not been sent.)
             current_theme <- session$getCurrentTheme()
@@ -26,6 +26,8 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             # Send the updated theme to this user's browser.
             session$setCurrentTheme(updated_theme)
         })
+        # Chart colours follow the selected colour theme.
+        theme_name <- shiny::reactive(input$app_colour_theme %||% "lavender")
         state <- shiny::reactiveVal(review_read_state(state_path, journal_path))
         editing <- shiny::reactiveVal(NULL)
         notify_error <- function(e) shiny::showNotification(conditionMessage(e), type = "error", duration = 8)
@@ -80,7 +82,11 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 selected <- shiny::isolate(input[[id]])
                 fill_tags(id, selected, choices[[id]])
             }
-            shiny::updateSelectInput(session, "r_support_code", choices = choices$r_codes, selected = shiny::isolate(input$r_support_code))
+            support <- shiny::isolate(input$r_support_code)
+            if (!length(support) || !nzchar(support) || !support %in% choices$r_codes) {
+                support <- dplyr::pull(dplyr::count(review_long(s$reviews, "codes"), label, sort = TRUE), label)[1]
+            }
+            shiny::updateSelectInput(session, "r_support_code", choices = choices$r_codes, selected = support)
             shiny::updateSelectizeInput(session, "r_definition_code", choices = choices$r_codes, selected = shiny::isolate(input$r_definition_code))
             shiny::updateSelectInput(session, "r_forget_alias", choices = s$names$alias)
         })
@@ -139,6 +145,19 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 shiny::showNotification("Suggestions added. Correct the lists, then confirm you reviewed them.")
             }, error = notify_error)
         })
+        output$r_word_count <- shiny::renderText({
+            words <- length(strsplit(stringr::str_squish(input$r_text %||% ""), " ")[[1]])
+            if (!nzchar(stringr::str_squish(input$r_text %||% ""))) "" else
+                sprintf("%d word%s", words, if (words == 1) "" else "s")
+        })
+        for (stage in c("during", "after")) local({
+            id <- paste0("r_", stage)
+            status_id <- paste0("r_", stage, "_status")
+            shiny::observeEvent(input[[id]], {
+                if (length(input[[id]]) && !identical(input[[status_id]], "reported"))
+                    shiny::updateSelectInput(session, status_id, selected = "reported")
+            }, ignoreNULL = TRUE)
+        })
         shiny::observeEvent(input$r_text, {
             shiny::updateCheckboxInput(session, "r_entities_confirmed", value = FALSE)
         }, ignoreInit = TRUE)
@@ -182,36 +201,43 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             }, error = notify_error)
         })
         output$r_recent <- shiny::renderTable({
-            dplyr::transmute(utils::head(dplyr::arrange(journal(), dplyr::desc(date)), 8), Night = date, 
-                Quality = sleep_quality, Stress = stress, Codes = themes)
+            dplyr::transmute(utils::head(dplyr::arrange(journal(), dplyr::desc(date)), 8),
+                Night = format(date, "%a %d %b"), Sleep = sprintf("%.1f h", sleep_hours),
+                Quality = sleep_quality, Stress = stress, Themes = gsub(";", ", ", themes))
         })
-        output$r_heatmap <- shiny::renderPlot(review_heatmap(in_period(), in_reviews(), input$r_bin, 
-            top = input$r_top))
-        output$r_code_stress <- shiny::renderPlot(review_stress_plot(in_period(), in_reviews(), top = input$r_top))
-        output$r_support <- shiny::renderTable({
+        output$r_theme_overview <- shiny::renderUI(theme_overview(in_period(), in_reviews()))
+        output$r_heatmap <- shiny::renderPlot(review_heatmap(in_period(), in_reviews(), input$r_bin,
+            top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
+        output$r_code_stress <- shiny::renderPlot(review_stress_plot(in_period(), in_reviews(),
+            top = input$r_top, theme = theme_name()), res = 96, bg = "transparent")
+        output$r_support <- shiny::renderUI({
             shiny::req(input$r_support_code)
-            dates <- dplyr::pull(dplyr::filter(review_long(in_reviews(), "codes"), label == input$r_support_code), 
+            dates <- dplyr::pull(dplyr::filter(review_long(in_reviews(), "codes"), label == input$r_support_code),
                 date)
-            dplyr::transmute(dplyr::left_join(dplyr::filter(in_period(), date %in% dates), dplyr::select(in_reviews(), 
-                date, note), by = "date"), Night = date, Dream = dream_text, Coding_note = note)
+            x <- dplyr::left_join(dplyr::filter(in_period(), date %in% dates),
+                                  dplyr::select(in_reviews(), date, note), by = "date")
+            x <- dplyr::arrange(x, dplyr::desc(date))
+            if (!nrow(x)) return(shiny::p(class = "dream-hint", "No dreams with this theme in the chosen dates."))
+            shiny::tagList(lapply(seq_len(nrow(x)), function(i) {
+                shiny::div(class = "dream-result",
+                    shiny::div(class = "dream-result-date", format(x$date[i], "%A %d %B")),
+                    shiny::div(class = "dream-result-text", x$dream_text[i]),
+                    if (nzchar(x$note[i] %||% "")) shiny::div(class = "dream-hint", "\U0001F4DD ", x$note[i]))
+            }))
         })
         counts <- shiny::reactive(review_emotion_counts(in_reviews()))
         emotion_order <- shiny::reactive({
             top_labels(dplyr::pull(dplyr::arrange(dplyr::summarise(dplyr::group_by(counts(), label), 
                 total = sum(nights), .groups = "drop"), dplyr::desc(total), label), label))
         })
-        draw_emotions <- function(stage, title) {
-            review_frequency_plot(dplyr::filter(counts(), .data$stage == .env$stage), title, fill = if (stage == 
-                "during") 
-                "#76559A"
-            else "#277F8E", order = emotion_order(), limit = max(c(1, counts()$nights)))
-        }
-        output$r_during_plot <- shiny::renderPlot(draw_emotions("during", "During Dreaming"))
-        output$r_after_plot <- shiny::renderPlot(draw_emotions("after", "After Waking"))
+        output$r_emotion_overview <- shiny::renderUI(emotion_overview(in_reviews()))
+        output$r_butterfly <- shiny::renderPlot(plot_emotion_butterfly(counts(), emotion_order(),
+            theme = theme_name()), res = 96, bg = "transparent")
         output$r_during_summary <- shiny::renderText(review_status_summary(in_reviews(), "during"))
         output$r_after_summary <- shiny::renderText(review_status_summary(in_reviews(), "after"))
         matches <- shiny::reactive(review_vad_matches(in_reviews(), state()$vad))
-        output$r_vad <- plotly::renderPlotly(review_vad_plot(matches(), input$r_vad_stage, state()$vad_limits))
+        output$r_vad <- plotly::renderPlotly(review_vad_plot(matches(), input$r_vad_stage, state()$vad_limits,
+            colour = get_dream_theme(theme_name())$accent[1]))
         output$r_coverage <- shiny::renderText({
             x <- dplyr::filter(matches(), stage == input$r_vad_stage)
             if (!nrow(state()$vad)) 
@@ -221,23 +247,28 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 state()$vad_source, state()$vad_limits[1], state()$vad_limits[2])
         })
         output$r_unmatched <- shiny::renderTable({
-            dplyr::transmute(dplyr::filter(matches(), stage == input$r_vad_stage, !is.finite(valence)), 
-                Unmatched_label = label, Nights = nights)
+            x <- dplyr::transmute(dplyr::filter(matches(), stage == input$r_vad_stage, !is.finite(valence)),
+                `Feeling not in the lexicon` = label, Nights = nights)
+            if (nrow(x)) x else NULL
         })
         entity_reviews <- shiny::reactive(dplyr::filter(in_reviews(), entities_reviewed))
-        output$r_entity_summary <- shiny::renderText(sprintf("Charts use %d confirmed nights out of %d logged nights in this period. Each label counts once per night. Unconfirmed entries are excluded; use Entry / review to confirm lists. In the demo, confirmations are synthetic.", 
+        output$r_entity_overview <- shiny::renderUI(entity_overview(entity_reviews(), nrow(in_period())))
+        output$r_entity_summary <- shiny::renderText(sprintf("Charts use %d confirmed nights out of %d logged nights. Each label counts once per night; confirm the lists in the New dream tab. In the demo, confirmations are synthetic.",
             nrow(entity_reviews()), nrow(in_period())))
         for (column in c("people", "animals", "objects")) local({
             kind <- column
+            # Plain titles: the chart font cannot draw emoji.
+            title <- c(people = "People", animals = "Animals", objects = "Objects")[[kind]]
             output[[paste0("r_", kind, "_plot")]] <- shiny::renderPlot({
                 x <- dplyr::count(review_long(entity_reviews(), kind), label, name = "nights")
                 order <- top_labels(dplyr::pull(dplyr::arrange(x, dplyr::desc(nights), label), label))
-                review_frequency_plot(x, stringr::str_to_sentence(kind), order = order)
-            })
+                review_frequency_plot(x, title, order = order, theme = theme_name())
+            }, res = 96, bg = "transparent")
         })
         display_meta <- shiny::reactive({
             codes <- review_unpack(reviews()$codes)
-            list(theme_meta = tibble::tibble(theme = codes, label = codes, colour = rep("#76559A", length(codes))), 
+            list(theme_meta = tibble::tibble(theme = codes, label = codes,
+                colour = unname(label_colours(codes, theme_name()))),
                 emotion_meta = tibble::tibble(emotion = character(), label = character(), emoji = character(), 
                   valence = double(), arousal = double()))
         })
@@ -253,20 +284,25 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             range <- calendar_range(input$r_cal_date, input$r_cal_view)
             dplyr::filter(display_journal(), date >= range[1], date <= range[2])
         })
+        shiny::observeEvent(input$r_cal_prev, shiny::updateDateInput(session, "r_cal_date",
+            value = shift_calendar_date(input$r_cal_date, input$r_cal_view, -1)))
+        shiny::observeEvent(input$r_cal_next, shiny::updateDateInput(session, "r_cal_date",
+            value = shift_calendar_date(input$r_cal_date, input$r_cal_view, 1)))
+        output$r_cal_title <- shiny::renderText({
+            shiny::req(input$r_cal_date)
+            calendar_title(input$r_cal_date, input$r_cal_view)
+        })
         output$r_cal_summary <- shiny::renderUI(calendar_stats(cal_entries()))
         output$r_cal_grid <- shiny::renderUI({
             range <- calendar_range(input$r_cal_date, input$r_cal_view)
-            dream_calendar(display_journal(), range[1], range[2], input$r_cal_fill, as.Date(input$r_cal_date), 
-                display_meta(), click_input = "r_cal_click")
+            dream_calendar(display_journal(), range[1], range[2], input$r_cal_fill, as.Date(input$r_cal_date),
+                display_meta(), click_input = "r_cal_click", theme = theme_name())
         })
         output$r_cal_night <- shiny::renderUI({
             date <- as.Date(input$r_cal_date)
             r <- dplyr::filter(reviews(), .data$date == .env$date)
-            shiny::tagList(dream_night_card(dplyr::filter(display_journal(), .data$date == .env$date), 
-                date, display_meta()), if (nrow(r)) 
-                shiny::tagList(shiny::p("During Dreaming: ", r$during_status, " \u00B7 ", r$during), shiny::p("After Waking: ", 
-                  r$after_status, " \u00B7 ", r$after), shiny::p("People: ", r$people, " \u00B7 Animals: ", r$animals, 
-                  " \u00B7 Objects: ", r$objects)))
+            shiny::tagList(dream_night_card(dplyr::filter(display_journal(), .data$date == .env$date),
+                date, display_meta()), if (nrow(r)) review_night_details(r))
         })
         sleep_nights <- shiny::reactive(last_nights(display_journal(), as.numeric(input$r_sleep_window)))
         output$r_sleep_ring <- shiny::renderUI({
@@ -277,11 +313,20 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
         })
         output$r_sleep_bubbles <- shiny::renderUI({
             summary <- sleep_summary(sleep_nights())
-            if (!is.null(summary)) 
+            if (!is.null(summary)) {
+                # Feelings live in the reviews (while dreaming), not in the journal.
+                nights_reviews <- dplyr::filter(reviews(), date %in% sleep_nights()$date,
+                                                during_status == "reported")
+                feelings <- review_long(nights_reviews, "during")
+                summary$top_emotion <- if (nrow(feelings))
+                    dplyr::pull(dplyr::count(feelings, label, sort = TRUE), label)[1] else NA_character_
                 sleep_stat_bubbles(summary, display_meta())
+            }
         })
-        output$r_sleep_hours <- shiny::renderPlot(plot_sleep_hours(sleep_nights()))
-        output$r_sleep_windows <- shiny::renderPlot(plot_sleep_windows(sleep_nights()))
+        output$r_sleep_hours <- shiny::renderPlot(plot_sleep_hours(sleep_nights(), theme = theme_name()), res = 96,
+                                                  bg = "transparent")
+        output$r_sleep_windows <- shiny::renderPlot(plot_sleep_windows(sleep_nights(), theme = theme_name()), res = 96,
+                                                    bg = "transparent")
         output$r_recommendations <- shiny::renderUI({
             n <- as.numeric(input$r_sleep_window)
             if (n == 0) 
@@ -291,26 +336,40 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             recommendation_cards(sleep_recommendations(display_journal(), display_meta()$emotion_meta, 
                 window_days = n))
         })
-        output$r_story <- shiny::downloadHandler(filename = function() paste0("sleep-stats-", Sys.Date(), 
-            ".png"), content = function(file) {
+        # The shareable story picture, made once per change of nights.
+        story_file <- shiny::reactive({
             shiny::req(nrow(sleep_nights()) > 0)
-            save_story_card(file, sleep_nights(), display_meta())
+            save_story_card(tempfile(fileext = ".png"), sleep_nights(), display_meta())
         })
+        output$r_story_preview <- shiny::renderImage({
+            list(src = story_file(), contentType = "image/png",
+                 alt = "Preview of your shareable dream stats picture")
+        }, deleteFile = FALSE)
+        output$r_story <- shiny::downloadHandler(filename = function() paste0("my-dream-stats-", Sys.Date(),
+            ".png"), content = function(file) file.copy(story_file(), file), contentType = "image/png")
         output$r_search_results <- shiny::renderUI({
             query <- stringr::str_trim(input$r_search %||% "")
-            if (!nzchar(query)) 
-                return(shiny::p("Search dream text, content codes, emotions or entities."))
+            if (!nzchar(query))
+                return(shiny::p(class = "dream-hint", "Type a word to search all your dreams."))
             x <- dplyr::left_join(journal(), reviews(), by = "date")
             columns <- c("dream_text", "codes", "during", "after", "people", "animals", "objects", "note")
             found <- rep(FALSE, nrow(x))
             for (column in columns) found <- found | stringr::str_detect(x[[column]], stringr::fixed(query, 
                 ignore_case = TRUE))
             x <- dplyr::arrange(x[found, ], dplyr::desc(date))
-            shiny::tagList(shiny::p(nrow(x), "matching nights"), lapply(seq_len(nrow(x)), function(i) {
-                shiny::div(class = "border-bottom mb-3", shiny::strong(as.character(x$date[i])), shiny::p(x$dream_text[i]), 
-                  shiny::p("Codes: ", x$codes[i]), shiny::p("During: ", x$during[i], " \u00B7 After: ", x$after[i]), 
-                  shiny::p("People: ", x$people[i], " \u00B7 Animals: ", x$animals[i], " \u00B7 Objects: ", x$objects[i]))
-            }))
+            chips <- function(values, prefix) {
+                lapply(review_unpack(values), function(v) shiny::span(class = "dream-chip is-soft", prefix, v))
+            }
+            shiny::tagList(shiny::p(class = "dream-hint", nrow(x), if (nrow(x) == 1) "dream found" else "dreams found"),
+                lapply(seq_len(nrow(x)), function(i) {
+                    shiny::div(class = "dream-result",
+                        shiny::div(class = "dream-result-date", format(x$date[i], "%A %d %B %Y")),
+                        shiny::div(class = "dream-result-text", x$dream_text[i]),
+                        shiny::div(class = "dream-chips",
+                            chips(x$codes[i], "\U0001F3F7\uFE0F "), chips(x$during[i], "\U0001F4AD "),
+                            chips(x$after[i], "\u2600\uFE0F "), chips(x$people[i], "\U0001F9D1 "),
+                            chips(x$animals[i], "\U0001F43E "), chips(x$objects[i], "\U0001F511 ")))
+                }))
         })
         shiny::observeEvent(input$r_define, tryCatch({
             code <- review_normalise(input$r_definition_code)

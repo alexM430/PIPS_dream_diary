@@ -1,0 +1,138 @@
+/* Dreamy look for the whole app. Colours come from the theme variables in
+   dream_theme_css() (src/dream_themes.R), so the colour menu restyles
+   everything at once. */
+
+/* ---- Page, fonts, sky ---------------------------------------------------- */
+body {
+  font-family: var(--dream-font);
+  color: var(--dream-ink);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255,255,255,.9) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 92% 8%, rgba(255,255,255,.9) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 40%, rgba(255,255,255,.8) 0 1.5px, transparent 2.5px),
+    linear-gradient(165deg, var(--dream-sky-1) 0%, var(--dream-sky-2) 55%, var(--dream-sky-3) 100%) fixed;
+  transition: background .6s ease;
+}
+h1, h2, h3, h4, h5, h6, .card-header, .navbar-brand { font-family: var(--dream-font); font-weight: 700; }
+.bslib-page-navbar > .navbar ~ .container-fluid,
+.bslib-sidebar-layout, .bslib-sidebar-layout > .main { background: transparent !important; }
+
+/* ---- Navbar --------------------------------------------------------------- */
+.navbar {
+  background: rgba(255, 255, 255, .55) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, .7);
+}
+.navbar-brand {
+  font-size: 1.45rem;
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent !important;
+}
+.navbar .nav-link { border-radius: 999px; padding: 6px 14px !important; margin: 0 2px;
+  font-weight: 600; color: var(--dream-muted) !important; transition: all .2s; }
+.navbar .nav-link:hover { background: rgba(255, 255, 255, .7); color: var(--dream-ink) !important; }
+.navbar .nav-link.active { color: #fff !important;
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12); }
+
+/* ---- Sidebar -------------------------------------------------------------- */
+.bslib-sidebar-layout > .sidebar {
+  background: rgba(255, 255, 255, .5) !important;
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(255, 255, 255, .7) !important;
+}
+.sidebar .control-label, .sidebar label { font-weight: 600; }
+
+/* ---- Cards ---------------------------------------------------------------- */
+.card {
+  background: var(--dream-card) !important;
+  border: 1px solid rgba(255, 255, 255, .8) !important;
+  border-radius: 26px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .06);
+  backdrop-filter: blur(6px);
+  overflow: visible;
+}
+.card-header { background: transparent !important; border-bottom: none !important;
+  font-size: 1.1rem; padding-top: 16px; }
+.dream-step { display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; margin-right: 8px; border-radius: 50%; font-size: .85rem;
+  color: #fff; background: linear-gradient(135deg, var(--dream-accent-1), var(--dream-accent-2)); }
+.dream-hint { font-size: .82rem; color: var(--dream-muted); margin: -4px 0 10px; }
+
+/* ---- Buttons -------------------------------------------------------------- */
+.btn { border-radius: 999px !important; font-weight: 600; font-family: var(--dream-font); }
+.btn-default, .btn-secondary, .btn-outline-primary {
+  background: #fff !important; color: var(--dream-accent-1) !important;
+  border: 2px solid var(--dream-lilac) !important; }
+.btn-default:hover, .btn-outline-primary:hover { background: var(--dream-sky-1) !important; }
+.btn-primary, .btn.dream-btn {
+  border: none !important; color: #fff !important;
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2)) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .14); }
+.btn-primary:hover, .btn.dream-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn.dream-save { width: 100%; padding: 14px; font-size: 1.15rem; }
+.dream-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+/* ---- Inputs --------------------------------------------------------------- */
+.form-control, .form-select, .selectize-input, .input-daterange input {
+  border-radius: 16px !important; border: 1.5px solid rgba(255, 255, 255, .9) !important;
+  background: rgba(255, 255, 255, .85) !important; color: var(--dream-ink) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .04) !important; }
+.form-control:focus, .selectize-input.focus { border-color: var(--dream-lilac) !important;
+  box-shadow: 0 0 0 3px var(--dream-sky-1) !important; }
+textarea.form-control { line-height: 1.6; }
+.dream-diary textarea {
+  min-height: 210px; font-size: 1.02rem; border-radius: 20px !important;
+  background-image: repeating-linear-gradient(transparent 0 31px, var(--dream-sky-1) 31px 32px) !important;
+  background-attachment: local !important; line-height: 32px; padding: 6px 16px !important; }
+.dream-word-count { text-align: right; font-size: .78rem; color: var(--dream-muted); margin-top: -8px; }
+
+/* Label chips in multi-select inputs. */
+.selectize-control.multi .selectize-input > div.item {
+  background: linear-gradient(90deg, var(--dream-lilac), var(--dream-pink)) !important;
+  color: #fff !important; border: none !important; border-radius: 999px !important;
+  padding: 2px 10px !important; font-weight: 600; }
+.selectize-control.plugin-remove_button .item .remove { border-left: none !important; color: #fff !important; }
+
+/* Sliders. */
+.irs--shiny .irs-bar { background: linear-gradient(90deg, var(--dream-lilac), var(--dream-pink)); border: none; }
+.irs--shiny .irs-handle { border-color: var(--dream-accent-1); }
+.irs--shiny .irs-single { background: var(--dream-accent-1); }
+.dream-scale { display: flex; justify-content: space-between; font-size: .78rem;
+  color: var(--dream-muted); margin: -12px 4px 8px; }
+
+/* ---- Feelings boxes in the entry form ------------------------------------- */
+.dream-feelings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .dream-feelings { grid-template-columns: 1fr; } }
+.dream-feeling-box { border-radius: 20px; padding: 12px 14px; background: rgba(255, 255, 255, .7); }
+.dream-feeling-box h6 { margin-bottom: 8px; }
+
+/* ---- Tables --------------------------------------------------------------- */
+.table { --bs-table-bg: transparent; font-size: .9rem; }
+.table th { color: var(--dream-muted); font-weight: 700; border-bottom-width: 1px; }
+.table td { border-color: rgba(0, 0, 0, .05); }
+
+/* ---- Tab headers and overview bubbles (Emotions, Themes, People) ---------- */
+.dream-tab-title {
+  font-size: 1.8rem; font-weight: 700; margin: 4px 0 2px;
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dream-tab-subtitle { color: var(--dream-muted); margin-bottom: 16px; }
+
+/* ---- Search and supporting-entry cards ------------------------------------ */
+.dream-result { background: rgba(255, 255, 255, .75); border-radius: 20px; padding: 14px 16px;
+  margin-bottom: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, .04); }
+.dream-result-date { font-weight: 700; }
+.dream-result-text { font-style: italic; margin: 6px 0 8px; line-height: 1.5; }
+.dream-chip.is-soft { border-color: transparent; background: var(--dream-sky-1); }
+
+/* ---- Plots ---------------------------------------------------------------- */
+.shiny-plot-output img { border-radius: 16px; }
+
+/* Inputs inside cards use the full card width. */
+.card .shiny-input-container:not(.shiny-input-container-inline),
+.card .form-group.shiny-input-container { width: 100% !important; max-width: 100%; }
+.card-header .dream-step + *, .btn > :first-child { margin-right: 4px; }
+
+/* Overview bubbles fit five in a row on a laptop screen. */
+.sleep-bubbles.dream-overview { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 18px; }
