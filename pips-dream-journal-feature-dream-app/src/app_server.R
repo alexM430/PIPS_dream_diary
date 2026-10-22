@@ -69,7 +69,8 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 max(dates)
             else Sys.Date()
             shiny::updateDateRangeInput(session, "r_period", start = first, end = last)
-            shiny::updateDateRangeInput(session, "r_theme_range", start = last - 29, end = last)
+            for (id in c("r_theme_range", "r_pattern_range"))
+                shiny::updateDateRangeInput(session, id, start = last - 29, end = last)
             shiny::updateDateInput(session, "r_date", value = last + 1)
             shiny::updateDateInput(session, "r_cal_date", value = last)
         }, once = TRUE)
@@ -206,20 +207,63 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 Night = format(date, "%a %d %b"), Sleep = sprintf("%.1f h", sleep_hours),
                 Quality = sleep_quality, Stress = stress, Themes = gsub(";", ", ", themes))
         })
-        # The Dream themes tab has its own period (last week/month/year, all, custom).
-        theme_range <- shiny::reactive({
-            shiny::req(input$r_theme_window)
-            theme_period_range(journal()$date, input$r_theme_window, input$r_theme_range)
-        })
-        theme_journal <- shiny::reactive(dplyr::filter(journal(), date >= theme_range()[1],
-                                                       date <= theme_range()[2]))
+        # The Dream themes and Your patterns tabs have their own period picker
+        # (see period_picker()). Returns the nights of the chosen period.
+        period_nights <- function(prefix) {
+            nights <- shiny::reactive({
+                window <- input[[paste0(prefix, "_window")]]
+                shiny::req(window)
+                range <- theme_period_range(journal()$date, window, input[[paste0(prefix, "_range")]])
+                dplyr::filter(journal(), date >= range[1], date <= range[2])
+            })
+            output[[paste0(prefix, "_period_text")]] <- shiny::renderText({
+                window <- input[[paste0(prefix, "_window")]]
+                range <- theme_period_range(journal()$date, window, input[[paste0(prefix, "_range")]])
+                sprintf("%s \u2013 %s \u00B7 %d nights logged%s", format(range[1], "%d %b %Y"),
+                        format(range[2], "%d %b %Y"), nrow(nights()),
+                        if (window %in% c("7", "30", "365")) " (counted back from your latest entry)" else "")
+            })
+            nights
+        }
+        theme_journal <- period_nights("r_theme")
         theme_reviews <- shiny::reactive(dplyr::filter(reviews(), date %in% theme_journal()$date))
-        output$r_theme_period_text <- shiny::renderText({
-            range <- theme_range()
-            sprintf("%s \u2013 %s \u00B7 %d nights logged%s", format(range[1], "%d %b %Y"),
-                    format(range[2], "%d %b %Y"), nrow(theme_journal()),
-                    if (input$r_theme_window %in% c("7", "30", "365"))
-                        " (counted back from your latest entry)" else "")
+
+        # Your patterns: the logistic regression from src/analysis.R on the chosen period.
+        pattern_journal <- period_nights("r_pattern")
+        pattern_data <- shiny::reactive({
+            dream_analysis_data(pattern_journal(),
+                                dplyr::filter(reviews(), date %in% pattern_journal()$date),
+                                state()$vad)
+        })
+        pattern_model <- shiny::reactive({
+            tryCatch(fit_negative_dream_model(pattern_data()), error = function(e) conditionMessage(e))
+        })
+        model_ready <- shiny::reactive(inherits(pattern_model(), "glm"))
+        output$r_pattern_overview <- shiny::renderUI({
+            d <- pattern_data()
+            results <- if (model_ready()) negative_dream_results(pattern_model()) else NULL
+            odds <- function(term) if (is.null(results)) "\u2014" else
+                sprintf("\u00D7%.2f", results$odds_ratio[results$term == term])
+            overview_bubbles(list(
+                c("\U0001F319", nrow(d), "nights with feelings analysed"),
+                c("\U0001F61F", if (nrow(d)) sprintf("%.0f%%", 100 * mean(d$negative)) else "\u2014",
+                  "of these dreams were negative"),
+                c("\u26A1", odds("stress"), "odds of a negative dream per stress point"),
+                c("\U0001F4A4", odds("sleep_hours"), "odds per extra hour of sleep")))
+        })
+        output$r_pattern_plot <- shiny::renderPlot({
+            if (!model_ready()) return(empty_plot(pattern_model()))
+            plot_negative_dream_model(pattern_model(), theme = theme_name())
+        }, res = 96, bg = "transparent")
+        output$r_pattern_text <- shiny::renderUI({
+            if (!model_ready()) {
+                return(shiny::p(class = "dream-hint", pattern_model(),
+                                "Try a longer period, or keep adding dreams with feelings."))
+            }
+            shiny::tagList(
+                lapply(describe_negative_dream_model(pattern_model()), shiny::p),
+                shiny::p(class = "dream-hint",
+                         "An odds ratio above 1 means more negative dreams, below 1 means fewer."))
         })
         output$r_theme_overview <- shiny::renderUI(theme_overview(theme_journal(), theme_reviews()))
         output$r_theme_clouds <- shiny::renderUI({
