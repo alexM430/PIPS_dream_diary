@@ -32,7 +32,7 @@ load_lexicons <- function(lexicon_dir = "data/lexicons") {
 #' @return Character vector of words.
 tokenize_text <- function(text) {
   text <- str_to_lower(coalesce(text, ""))
-  text <- str_remove_all(text, "['’]")
+  text <- str_remove_all(text, "['\u2019]")
   words <- str_split(text, "[^a-z]+")[[1]]
   words[words != ""]
 }
