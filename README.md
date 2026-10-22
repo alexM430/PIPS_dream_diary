@@ -60,5 +60,4 @@ testthat::test_dir("tests/testthat")
 ## Notes
 
 The app is intended for a single user. Dictionary matches require review
-before they count as confirmed labels. Check the NRC lexicon's
-redistribution terms before sharing the embedded ratings.
+before they count as confirmed labels.
