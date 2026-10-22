@@ -77,7 +77,7 @@ plot_story_card <- function(nights, lexicons, target_hours = c(7, 9), max_bars =
                         stats$y[i] - 0.7, stats$y[i] + 0.7) |>
       mutate(group = i)
   }))
-  date_range <- paste(format(summary$first, "%d %b"), "–",
+  date_range <- paste(format(summary$first, "%d %b"), "\u2013",
                       format(summary$last, "%d %b %Y"))
 
   ggplot() +

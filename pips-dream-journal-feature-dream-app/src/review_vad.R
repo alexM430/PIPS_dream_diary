@@ -1,0 +1,57 @@
+# Optional valence-arousal-dominance (VAD) emotion map, based on an imported
+# NRC VAD v2 lexicon (Mohammad, 2025).
+
+.review_base_vad <- function(matches, stage, limits) {
+    x <- dplyr::filter(matches, .data$stage == .env$stage, is.finite(valence), is.finite(arousal), is.finite(dominance))
+    if (!nrow(x)) {
+        return(plotly::layout(plotly::plot_ly(), annotations = list(list(text = "No matched emotion labels for this stage. Import NRC VAD v2 under Settings.", 
+            x = 0.5, y = 0.5, xref = "paper", yref = "paper", showarrow = FALSE))))
+    }
+    safe_labels <- htmltools::htmlEscape(x$label)
+    x$hover <- sprintf("%s<br>Nights: %d<br>Valence: %.3f<br>Arousal: %.3f<br>Dominance: %.3f", safe_labels, 
+        x$nights, x$valence, x$arousal, x$dominance)
+    plotly::layout(plotly::plot_ly(x, x = ~valence, y = ~arousal, z = ~dominance, type = "scatter3d", 
+        mode = "markers", text = ~hover, hoverinfo = "text", size = ~nights, sizes = c(7, 22), marker = list(color = "#76559A", 
+            opacity = 0.8)), scene = list(xaxis = list(title = "Valence: unpleasant \u2192 pleasant", range = limits), 
+        yaxis = list(title = "Arousal", range = limits), zaxis = list(title = "Dominance: low \u2192 high control", 
+            range = limits), aspectmode = "cube"), margin = list(l = 0, r = 0, b = 0, t = 15))
+}
+
+review_import_vad <- function(path, limits) {
+    x <- readr::read_csv(path, col_types = readr::cols(.default = readr::col_character()), show_col_types = FALSE)
+    names(x) <- stringr::str_to_lower(stringr::str_trim(names(x)))
+    needed <- c("term", "valence", "arousal", "dominance")
+    if (!all(needed %in% names(x))) 
+        stop("Prepare a CSV with columns: term,valence,arousal,dominance. Follow the lexicon documentation for the correct source columns.")
+    if (anyNA(x[needed])) 
+        stop("VAD table contains missing values.")
+    x$term <- stringr::str_to_lower(stringr::str_squish(x$term))
+    if (any(!nzchar(x$term))) 
+        stop("Empty VAD terms.")
+    for (column in needed[-1]) {
+        value <- suppressWarnings(as.numeric(x[[column]]))
+        if (any(!is.finite(value) | value < limits[1] | value > limits[2])) 
+            stop("Invalid or out-of-range ", column, " scores. Check the documented scale.")
+        x[[column]] <- value
+    }
+    x <- dplyr::distinct(dplyr::select(x, dplyr::all_of(needed)))
+    if (anyDuplicated(x$term)) 
+        stop("Conflicting duplicate VAD terms; resolve them before import.")
+    x
+}
+
+review_vad_matches <- function(reviews, vad) {
+    x <- dplyr::count(review_emotion_long(reviews), label, stage, name = "nights")
+    dplyr::left_join(x, vad, by = c(label = "term"))
+}
+
+review_vad_plot <- function(matches, stage, limits) {
+    x <- dplyr::filter(matches, .data$stage == .env$stage, is.finite(valence), is.finite(arousal), is.finite(dominance))
+    if (nrow(x)) 
+        return(.review_base_vad(matches, stage, limits))
+    plotly::config(plotly::layout(plotly::plot_ly(), xaxis = list(visible = FALSE, range = c(0, 1)), 
+        yaxis = list(visible = FALSE, range = c(0, 1)), annotations = list(list(text = paste0("Affective-space plot unavailable.<br>", 
+            "Requires reported emotions and matching terms<br>", "from an imported VAD lexicon. Frequency charts are separate."), 
+            x = 0.5, y = 0.5, xref = "paper", yref = "paper", showarrow = FALSE)), margin = list(l = 15, 
+            r = 15, b = 15, t = 15)), displayModeBar = FALSE)
+}

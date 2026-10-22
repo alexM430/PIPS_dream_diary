@@ -3,7 +3,8 @@
 
 required_packages <- c(
   "shiny", "bslib", "dplyr", "tidyr", "ggplot2",
-  "readr", "stringr", "lubridate", "purrr", "tibble"
+  "readr", "stringr", "lubridate", "purrr", "tibble",
+  "plotly", "htmltools", "scales"
 )
 
 missing_packages <- required_packages[

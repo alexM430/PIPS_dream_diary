@@ -13,4 +13,6 @@ library(purrr)
 library(tibble)
 library(testthat)  # unit tests in tests/testthat
 library(rmarkdown) # rendering main.qmd
-library(plotly)    # interactive charts in src/reviewed_app.R
+library(plotly)    # 3D emotion map in src/review_vad.R
+library(htmltools)
+library(scales)

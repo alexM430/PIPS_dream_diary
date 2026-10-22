@@ -20,12 +20,15 @@ install.packages(c(
 
 ## Run
 
-Open the project in RStudio and run from the project root:
+Open the `pips-dream-journal-feature-dream-app` folder in RStudio and run:
 
 ```r
-source("src/reviewed_app.R")
-run_fixed_reviewed_app()
+renv::restore()   # first time only: installs the recorded package versions
+source("src/setup.R")
+run_dream_app()
 ```
+
+`main.qmd` starts the same app.
 
 Keep `data/reviewed_dream_journal.rds` included: it contains the saved
 entries, reviewed labels and emotion lexicon. No demo generation or
@@ -35,8 +38,10 @@ lexicon import is required.
 
 ```text
 main.qmd                         project report
-src/reviewed_app.R               consolidated app and launcher
-src/                             supporting R scripts
+src/run_dream_app.R              run_dream_app(): starts the app
+src/app_ui.R, src/app_server.R   app layout and logic
+src/review_*.R                   reviewed labels, entities, charts, VAD map
+src/                             other supporting R scripts
 data/reviewed_dream_journal.rds   saved entries, reviews and lexicon
 data/dream_journal.csv            journal CSV
 data/lexicons/                    dictionaries and metadata
@@ -44,8 +49,7 @@ www/                             web assets, where supplied
 tests/testthat/                  unit tests
 ```
 
-Keep supporting files in their existing folders. The old
-`annas_revision.R` and `reviewed_demo.R` files are not required.
+Keep supporting files in their existing folders.
 
 ## Tests
 
