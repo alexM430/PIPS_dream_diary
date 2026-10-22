@@ -13,3 +13,4 @@ library(purrr)
 library(tibble)
 library(testthat)  # unit tests in tests/testthat
 library(rmarkdown) # rendering main.qmd
+library(plotly)    # interactive charts in src/reviewed_app.R
