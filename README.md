@@ -1,50 +1,60 @@
 # Dream Journal
 
-Edit test
+A Shiny app to log dreams and explore content codes, emotions, recurring
+people, animals and objects, and sleep and stress patterns.
 
-A Shiny app to log dreams and explore their themes, emotions, recurring people
-and objects, and how they relate to sleep and stress. It ships with a simulated
-journal of one dreamer (180 nights) so every view works straight away.
+Includes a synthetic journal of 180 nights, simulated reviewed labels,
+and an imported emotion lexicon.
 
 ## Install
 
-Requires R ≥ 4.1 and, to render `main.qmd`, [Quarto](https://quarto.org).
+Requires R ≥ 4.1. Quarto is needed only to render `main.qmd`.
 
 ```r
-install.packages(c("shiny", "bslib", "dplyr", "tidyr", "ggplot2", "readr",
-                   "stringr", "lubridate", "purrr", "tibble", "testthat"))
+install.packages(c(
+  "shiny", "bslib", "dplyr", "tidyr", "ggplot2", "readr",
+  "stringr", "lubridate", "purrr", "tibble", "plotly",
+  "htmltools", "scales", "testthat"
+))
 ```
 
 ## Run
 
-Open `main.qmd` in RStudio and run the chunks, or from an R console in the
-project root:
+Open the project in RStudio and run from the project root:
 
 ```r
-source("src/setup.R")
-run_dream_app()
+source("src/reviewed_app.R")
+run_fixed_reviewed_app()
 ```
 
-Run the tests with `testthat::test_dir("tests/testthat")`.
+Keep `data/reviewed_dream_journal.rds` included: it contains the saved
+entries, reviewed labels and emotion lexicon. No demo generation or
+lexicon import is required.
 
 ## Structure
 
-```
-main.qmd                  main deliverable
-data/
-  dream_journal.csv       journal the app reads and writes (created on first run)
-  lexicons/               word lists (themes, emotions, people, objects) + colours
-src/
-  setup.R                 loads packages and all functions below
-  journal_io.R            read/validate/save entries, time helpers
-  simulate_journal.R      simulated dream journal
-  text_features.R         word-list detection and valence/arousal scores
-  plots.R                 ggplot2 figures used by the app
-  sleep_recommendations.R rule-based sleep advice with references
-  app_ui.R, app_server.R  Shiny interface and logic
-  run_dream_app.R         dream_app() / run_dream_app()
-tests/testthat/           unit tests
+```text
+main.qmd                         project report
+src/reviewed_app.R               consolidated app and launcher
+src/                             supporting R scripts
+data/reviewed_dream_journal.rds   saved entries, reviews and lexicon
+data/dream_journal.csv            journal CSV
+data/lexicons/                    dictionaries and metadata
+www/                             web assets, where supplied
+tests/testthat/                  unit tests
 ```
 
-To add a theme, emotion, person or object, add rows to the CSVs in
-`data/lexicons/`; no code changes are needed.
+Keep supporting files in their existing folders. The old
+`annas_revision.R` and `reviewed_demo.R` files are not required.
+
+## Tests
+
+```r
+testthat::test_dir("tests/testthat")
+```
+
+## Notes
+
+The app is intended for a single user. Dictionary matches require review
+before they count as confirmed labels. Check the NRC lexicon's
+redistribution terms before sharing the embedded ratings.
