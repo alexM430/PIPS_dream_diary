@@ -16,6 +16,13 @@ dream_app_ui <- function(lexicons) {
                      fg = "#222222"),
     sidebar = sidebar(
       width = 260,
+      # Unchecked means the app shows personal data.
+      shiny::checkboxInput(
+        inputId = "demo_mode",
+        label = "Demo mode — show an example diary",
+        value = FALSE
+      ),
+      shiny::uiOutput("data_mode_status"),
       dateRangeInput("period", "Period shown in the charts",
                      weekstart = 1, format = "d M yyyy"),
       radioButtons("bin", "Group charts by", inline = TRUE,
@@ -48,8 +55,7 @@ dream_app_ui <- function(lexicons) {
           checkboxGroupInput("entry_themes", "Themes", theme_choices, inline = TRUE),
           checkboxGroupInput("entry_emotions", "Emotions", emotion_choices,
                              inline = TRUE),
-          actionButton("save", "Save entry", icon = icon("floppy-disk"),
-                       class = "btn-primary")
+          shiny::uiOutput("save_entry_control")
         ),
         card(
           card_header("Latest entries"),

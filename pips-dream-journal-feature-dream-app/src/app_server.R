@@ -7,18 +7,82 @@
 #' @return A Shiny server function.
 dream_app_server <- function(journal_path, lexicons) {
   function(input, output, session) {
-    journal <- reactiveVal(read_journal(journal_path))
-    scored <- reactive(add_affect_scores(journal(), lexicons$emotion_meta))
+    # Create one simulated diary per session, not on every toggle change.
+    demo_journal <- simulate_dream_journal()
+    
+    # Use the simulated table's columns/types as the empty-journal template.
+    # No simulated rows are copied into the personal journal.
+    initial_personal <- if (file.exists(journal_path)) {
+      read_journal(journal_path)
+    } else {
+      demo_journal[0, , drop = FALSE]
+    }
+    
+    personal_journal <- shiny::reactiveVal(initial_personal)
+    
+    # Existing charts/search already read journal(), so they automatically
+    # switch datasets without rewriting each individual output.
+    journal <- shiny::reactive({
+      if (isTRUE(input$demo_mode)) {
+        demo_journal
+      } else {
+        personal_journal()
+      }
+    })
+    
+    scored <- shiny::reactive({
+      add_affect_scores(journal(), lexicons$emotion_meta)
+    })
+    
+    output$data_mode_status <- shiny::renderUI({
+      if (isTRUE(input$demo_mode)) {
+        shiny::helpText(
+          "Demo: this is a simulated diary, not your personal data. ",
+          "Switch Demo mode off to enter and analyse your own diary."
+        )
+      } else {
+        shiny::helpText(
+          "Self-Analysis: entries and results use your personal diary."
+        )
+      }
+    })
+    
+    output$save_entry_control <- shiny::renderUI({
+      if (isTRUE(input$demo_mode)) {
+        shiny::tagList(
+          shiny::tags$button(
+            type = "button",
+            class = "btn btn-primary",
+            disabled = "disabled",
+            "Save unavailable in Demo mode"
+          ),
+          shiny::helpText("Switch Demo mode off before saving an entry.")
+        )
+      } else {
+        shiny::actionButton(
+          "save", "Save entry",
+          icon = shiny::icon("floppy-disk"),
+          class = "btn-primary"
+        )
+      }
+    })
 
-    # Start every date picker at the most recent entry.
-    observe({
+    # Reset dates at startup and whenever the user changes data mode.
+    # Otherwise the personal diary could inherit the demo's date filters.
+    shiny::observeEvent(input$demo_mode, {
       dates <- journal()$date
+      dates <- dates[!is.na(dates)]
+      
       last <- if (length(dates) > 0) max(dates) else Sys.Date()
       first <- if (length(dates) > 0) min(dates) else Sys.Date() - 30
-      updateDateRangeInput(session, "period", start = first, end = last)
-      updateDateInput(session, "cal_date", value = last)
-      updateDateInput(session, "entry_date", value = last + 1)
-    }) |> bindEvent(TRUE, once = TRUE)
+      next_entry <- if (length(dates) > 0) last + 1 else Sys.Date()
+      
+      shiny::updateDateRangeInput(
+        session, "period", start = first, end = last
+      )
+      shiny::updateDateInput(session, "cal_date", value = last)
+      shiny::updateDateInput(session, "entry_date", value = next_entry)
+    }, ignoreNULL = FALSE)
 
     in_period <- reactive({
       req(input$period)
@@ -37,34 +101,74 @@ dream_app_server <- function(journal_path, lexicons) {
       }
     })
 
-    observeEvent(input$save, {
+    shiny::observeEvent(input$save, {
+      # Guard the write operation even if a stale/manual event is received.
+      if (isTRUE(input$demo_mode)) {
+        shiny::showNotification(
+          "Demo data is read-only. Switch Demo mode off to save your entry.",
+          type = "warning"
+        )
+        return()
+      }
+      
       entry <- tryCatch(
-        new_entry(input$entry_date, input$entry_bedtime, input$entry_wake,
-                  input$entry_quality, input$entry_stress, input$entry_text,
-                  input$entry_themes, input$entry_emotions),
+        new_entry(
+          input$entry_date, input$entry_bedtime, input$entry_wake,
+          input$entry_quality, input$entry_stress, input$entry_text,
+          input$entry_themes, input$entry_emotions
+        ),
         error = function(e) {
-          showNotification(conditionMessage(e), type = "error")
+          shiny::showNotification(conditionMessage(e), type = "error")
           NULL
         }
       )
-      req(entry)
-      replaced <- entry$date %in% journal()$date
-      journal(upsert_entry(journal(), entry))
-      write_journal(journal(), journal_path)
-
-      showNotification(
-        if (replaced) "Entry updated." else "Entry saved.", type = "message"
+      shiny::req(entry)
+      
+      # Always save to the personal dataset, never the displayed demo.
+      replaced <- entry$date %in% personal_journal()$date
+      updated_personal <- upsert_entry(personal_journal(), entry)
+      
+      # Ensure the destination folder exists before writing the CSV.
+      dir.create(dirname(journal_path), recursive = TRUE, showWarnings = FALSE)
+      
+      # Report write errors without claiming the entry was saved.
+      saved <- tryCatch({
+        write_journal(updated_personal, journal_path)
+        TRUE
+      }, error = function(e) {
+        shiny::showNotification(
+          paste("Could not save your diary:", conditionMessage(e)),
+          type = "error"
+        )
+        FALSE
+      })
+      shiny::req(saved)
+      personal_journal(updated_personal)
+      
+      shiny::showNotification(
+        if (replaced) "Entry updated." else "Entry saved.",
+        type = "message"
       )
-      if (entry$date > input$period[2] || entry$date < input$period[1]) {
-        updateDateRangeInput(session, "period",
-                             start = min(input$period[1], entry$date),
-                             end = max(input$period[2], entry$date))
+      
+      if (!is.null(input$period) && length(input$period) == 2) {
+        if (entry$date > input$period[2] || entry$date < input$period[1]) {
+          shiny::updateDateRangeInput(
+            session, "period",
+            start = min(input$period[1], entry$date),
+            end = max(input$period[2], entry$date)
+          )
+        }
       }
-      updateDateInput(session, "entry_date", value = entry$date + 1)
-      updateTextAreaInput(session, "entry_text", value = "")
-      updateCheckboxGroupInput(session, "entry_themes", selected = character())
-      updateCheckboxGroupInput(session, "entry_emotions", selected = character())
-    })
+      
+      shiny::updateDateInput(session, "entry_date", value = entry$date + 1)
+      shiny::updateTextAreaInput(session, "entry_text", value = "")
+      shiny::updateCheckboxGroupInput(
+        session, "entry_themes", selected = character()
+      )
+      shiny::updateCheckboxGroupInput(
+        session, "entry_emotions", selected = character()
+      )
+    }, ignoreInit = TRUE)
 
     output$recent_entries <- renderTable({
       journal() |>
