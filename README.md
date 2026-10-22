@@ -9,7 +9,11 @@ Users can reupload their diary at a later moment to continue filling it in.
 
 ## Requirements
 
-Requires R 4.6.1 to render `main.qmd`.
+- R ≥ 4.4.1 (the lockfile was made with R 4.6.1; we also tested the project
+  with R 4.4.1). If `renv::status()` says the R version differs from the
+  lockfile, you can ignore that message as long as no packages are listed.
+- RStudio (recent versions include Quarto, which is needed to render
+  `main.qmd`)
 
 ## Features
 
@@ -36,6 +40,7 @@ git clone https://github.com/alexM430/PIPS_dream_diary
 ```
 
 Or download it on GitHub with **Code → Download ZIP** and unzip it.
+
 ### 2. Open the project 
 Double-click **`PIPS_dream_diary.Rproj`**. RStudio opens in the right folder,
 and renv sets itself up automatically (the first time this can take a
@@ -48,19 +53,9 @@ Not using RStudio? Start R in the `PIPS_dream_diary` folder instead, or run
 
 ``` r
 install.packages("renv") # Only the first time
-renv::activate()
 renv::restore()
-
-
-**If `renv::restore()` fails**, install the packages directly instead:
-
-install.packages(c(
-  "shiny", "bslib", "dplyr", "tidyr", "ggplot2", "readr",
-  "stringr", "lubridate", "purrr", "tibble", "plotly",
-  "htmltools", "scales", "knitr", "rmarkdown", "testthat"
-))
-
 ```
+If the error *Error: attempt to use zero-length variable name*, run the renv::restore in the console.
 ### 4. Read the report
 
 Open `main.qmd` and click **Render**. The report opens as a web page.
