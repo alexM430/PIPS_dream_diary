@@ -107,13 +107,5 @@ testthat::test_dir("tests/testthat")
 
 
 ## References
-
-Mohammad, S. M. (2025). NRC VAD Lexicon v2: Norms for valence, arousal, and
-dominance for over 55k English terms. <https://saifmohammad.com/WebPages/nrc-vad.html>
-
-Schredl, M., & Hofmann, F. (2003). Continuity between waking activities and
-dream activities. *Consciousness and Cognition, 12*(2), 298–308.
-
-Walker, M. P., & van der Helm, E. (2009). Overnight therapy? The role of sleep
-in emotional brain processing. *Psychological Bulletin, 135*(5), 731–748.
+References can be found in the main.qmd file.
 
