@@ -1,3 +1,4 @@
+---
 title: "Dream Journal: an app for exploring dreams, emotions and sleep"
 author: "PIPS Group: Alex Müller, Anna Karumdize, Farah Qureshi"
 format: html
@@ -5,6 +6,7 @@ execute:
   echo: true
   warning: false
   message: false
+---
 
 # Project overview
 
