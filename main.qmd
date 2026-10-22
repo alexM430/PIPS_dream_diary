@@ -50,8 +50,7 @@ emotional processing more negative (Walker & van der Helm, 2009).
 
 # Data
 
-Run this document from the project folder
-(`pips-dream-journal-feature-dream-app/`). The chunk below loads the packages
+Run this document from the repository root. The chunk below loads the packages
 and the functions in `src/`.
 
 ```{r setup}

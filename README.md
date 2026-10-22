@@ -49,13 +49,12 @@ renv::snapshot()
 
 ```
 
-Open the `pips-dream-journal-feature-dream-app` folder in RStudio, then open main.qmd and follow the steps explained.
+Open the repository folder in RStudio, then open main.qmd and follow the steps explained.
 Keep `data/reviewed_dream_journal.rds` included: it contains the saved entries, reviewed labels and emotion lexicon. No demo generation or lexicon import is required.
 
 ## Structure
 
 ``` text
-pips-dream-journal-feature-dream-app/
 ├── main.qmd                    project report (research question + analysis)
 ├── renv.lock, renv/, .Rprofile pinned package versions
 ├── renv_dependencies.R         package list for renv (never run)
