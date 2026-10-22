@@ -52,8 +52,10 @@ Not using RStudio? Start R in the `PIPS_dream_diary` folder instead, or run
 ### 3. Install packages
 
 ``` r
-install.packages("renv") # Only the first time
-renv::restore()
+install.packages("renv") # Only the first time, run in the console
+renv::restore() # run in the console
+renv::status() # run in the console and check if the packages are installed. if not, run renv::restore() again.
+
 ```
 If the error *Error: attempt to use zero-length variable name*, run the renv::restore in the console.
 ### 4. Read the report
