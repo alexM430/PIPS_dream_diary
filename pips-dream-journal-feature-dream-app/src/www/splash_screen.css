@@ -1,0 +1,116 @@
+/* Cloudy loading screen (see src/splash_screen.R). */
+
+#dream-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: "Quicksand", "Nunito", system-ui, sans-serif;
+  background: linear-gradient(170deg, #D9C8FF 0%, #F6D3EC 45%, #FFE3D3 100%);
+  transition: opacity 1.2s ease 0.6s, visibility 0s linear 1.8s;
+}
+#dream-splash.is-clearing { opacity: 0; visibility: hidden; }
+
+/* Twinkling stars behind the clouds. */
+.splash-stars {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 70% 12%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 40%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 40% 45%, #fff 0 1px, transparent 2px),
+    radial-gradient(circle at 25% 75%, #fff 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 60% 85%, #fff 0 1px, transparent 2px);
+  animation: splash-twinkle 2.4s ease-in-out infinite alternate;
+}
+
+/* Clouds: the outer element moves aside when clearing, the inner puff drifts. */
+.splash-cloud {
+  position: absolute;
+  transition: transform 1.6s cubic-bezier(.65, 0, .35, 1), opacity 1.6s ease;
+}
+#dream-splash.is-clearing .splash-cloud.is-left { transform: translateX(-120vw); opacity: 0; }
+#dream-splash.is-clearing .splash-cloud.is-right { transform: translateX(120vw); opacity: 0; }
+
+.splash-puff {
+  position: relative;
+  width: var(--size);
+  height: calc(var(--size) * 0.36);
+  border-radius: 999px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  animation: splash-drift 7s ease-in-out infinite alternate;
+  animation-delay: calc(var(--delay) * -1);
+}
+.splash-puff::before,
+.splash-puff::after {
+  content: "";
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+.splash-puff::before { width: 48%; height: 135%; left: 14%; top: -62%; }
+.splash-puff::after  { width: 36%; height: 105%; left: 50%; top: -42%; }
+
+/* Far clouds are smaller, softer and paler; near clouds are bright. */
+.layer-1 .splash-puff { opacity: .55; filter: blur(3px); }
+.layer-2 .splash-puff { opacity: .8;  filter: blur(1.5px) drop-shadow(0 10px 20px rgba(167, 139, 250, .18)); }
+.layer-3 .splash-puff { opacity: .97; filter: drop-shadow(0 14px 28px rgba(236, 72, 153, .16)); }
+
+/* Title in the middle. */
+.splash-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #5B4B8A;
+  transition: opacity .8s ease, transform .8s ease;
+}
+#dream-splash.is-clearing .splash-center { opacity: 0; transform: translateY(-24px); }
+
+.splash-moon { font-size: 3.4rem; animation: splash-float 3s ease-in-out infinite; }
+.splash-title {
+  font-size: clamp(2.4rem, 7vw, 4.4rem);
+  font-weight: 700;
+  margin: 8px 0 4px;
+  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+}
+.splash-subtitle { font-size: 1.15rem; font-weight: 600; margin: 0; }
+.splash-dots span { animation: splash-blink 1.4s infinite both; }
+.splash-dots span:nth-child(2) { animation-delay: .2s; }
+.splash-dots span:nth-child(3) { animation-delay: .4s; }
+.splash-skip { margin-top: 28px; font-size: .8rem; font-weight: 600; opacity: .55; }
+
+@keyframes splash-drift {
+  from { transform: translate(-50%, -50%); }
+  to   { transform: translate(calc(-50% + 40px), calc(-50% - 6px)); }
+}
+@keyframes splash-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+@keyframes splash-twinkle {
+  from { opacity: .35; }
+  to   { opacity: 1; }
+}
+@keyframes splash-blink {
+  0%, 80%, 100% { opacity: 0; }
+  40%           { opacity: 1; }
+}
+
+/* People who turn off animations get a simple fade instead. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-puff, .splash-moon, .splash-stars, .splash-dots span { animation: none; }
+  .splash-dots span { opacity: 1; }
+  #dream-splash.is-clearing .splash-cloud.is-left,
+  #dream-splash.is-clearing .splash-cloud.is-right { transform: none; }
+}

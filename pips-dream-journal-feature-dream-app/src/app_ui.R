@@ -1,9 +1,19 @@
-# User interface of the dream journal app.
+# User interface of the Dream Journal app (originally Anna's reviewed app),
+# plus the cloudy loading screen and the colour-theme menu.
+
+#' Colour presets for the "App colour theme" menu: accent, page background
+#' and text colour.
+app_colour_presets <- list(
+  lavender = list(label = "Lavender (original)", primary = "#5B4B8A", bg = "#FBFAFD", fg = "#222222"),
+  ocean = list(label = "Ocean blue", primary = "#075985", bg = "#F0F9FF", fg = "#172554"),
+  forest = list(label = "Forest green", primary = "#166534", bg = "#F0FDF4", fg = "#14291C")
+)
 
 #' Build the app UI.
 #'
-#' @param lexicons Output of `load_lexicons()`; used for the theme and emotion
-#'   choices in the entry form.
+#' @param css_paths Stylesheets for the calendar and Sleep tab.
+#' @param splash_seconds Minimum seconds the cloudy loading screen is shown;
+#'   0 turns it off.
 #' @return A bslib page.
 dream_app_ui <- function(lexicons) {
   theme_choices <- setNames(lexicons$theme_meta$theme, lexicons$theme_meta$label)

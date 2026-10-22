@@ -18,13 +18,15 @@ recommendation_rules <- list(
 #'   negative valence count as negative dreams.
 #' @param window_days Number of most recent nights considered.
 #' @param rules Thresholds; see `recommendation_rules`.
-#' @return Tibble with `title`, `message` and `source`, one row per advice.
+#' @return Tibble with `emoji`, `title`, `message` and `source`, one row per
+#'   advice.
 sleep_recommendations <- function(journal, emotion_meta, window_days = 14,
                                   rules = recommendation_rules) {
   recent <- if (nrow(journal) == 0) journal else
     filter(journal, date > max(date) - window_days)
   if (nrow(recent) < rules$min_nights) {
     return(tibble(
+      emoji = "\U0001F4D3",
       title = "Keep logging",
       message = paste0("Log at least ", rules$min_nights,
                        " nights to get personal recommendations."),
@@ -40,49 +42,50 @@ sleep_recommendations <- function(journal, emotion_meta, window_days = 14,
                 \(x) any(x %in% negative_emotions), logical(1)))
 
   advice <- list()
-  add <- function(title, message, source) {
-    advice[[length(advice) + 1]] <<- tibble(title, message, source)
+  add <- function(emoji, title, message, source) {
+    advice[[length(advice) + 1]] <<- tibble(emoji, title, message, source)
   }
 
   if (mean(recent$sleep_hours) < rules$min_sleep_hours) {
-    add("Sleep a little longer",
+    add("\U0001F4A4", "Sleep a little longer",
         sprintf("You slept %.1f hours on average. Adults are advised to sleep 7-9 hours; try moving your bedtime 15 minutes earlier each week.",
                 mean(recent$sleep_hours)),
         "Hirshkowitz et al. (2015)")
   }
   if (sd(bedtime_hours) > rules$max_bedtime_sd_hours) {
-    add("Keep a regular bedtime",
+    add("\u23F0", "Keep a regular bedtime",
         sprintf("Your bedtime varied by about %.1f hours (SD). Going to bed and getting up at similar times, also on weekends, supports better sleep.",
                 sd(bedtime_hours)),
         "Phillips et al. (2017)")
   }
   if (mean(bedtime_hours) > clock_to_evening_hours(rules$latest_mean_bedtime)) {
-    add("Wind down earlier",
+    add("\U0001F56F\uFE0F", "Wind down earlier",
         paste0("Your average bedtime was ", evening_hours_to_clock(mean(bedtime_hours)),
                ". Dim lights and put screens away an hour before you want to sleep."),
         "Irish et al. (2015)")
   }
   if (mean(recent$stress) >= rules$high_stress) {
-    add("Make room for relaxation",
+    add("\U0001F9D8", "Make room for relaxation",
         sprintf("Your average stress was %.1f/10. A short relaxation routine before bed (breathing, writing down worries) can make it easier to fall asleep.",
                 mean(recent$stress)),
         "Irish et al. (2015)")
   }
   if (mean(recent$sleep_quality) <= rules$low_quality) {
-    add("Check the basics",
+    add("\u2615", "Check the basics",
         sprintf("Your average sleep quality was %.1f/10. Avoid caffeine after lunch and alcohol before bed, and keep the bedroom dark, quiet and cool.",
                 mean(recent$sleep_quality)),
         "Irish et al. (2015)")
   }
   if (negative_share > rules$max_negative_share) {
-    add("Many unpleasant dreams",
+    add("\U0001F32B\uFE0F", "Many unpleasant dreams",
         sprintf("%.0f%% of your recalled dreams had negative emotions. If nightmares keep coming back and bother you, imagery rehearsal therapy is an effective treatment; talk to a GP or psychologist.",
                 100 * negative_share),
         "Krakow & Zadra (2006)")
   }
 
   if (length(advice) == 0) {
-    return(tibble(title = "Your routine looks healthy",
+    return(tibble(emoji = "\U0001F31F",
+                  title = "Your routine looks healthy",
                   message = "Nothing stood out in your recent nights. Keep it up!",
                   source = ""))
   }

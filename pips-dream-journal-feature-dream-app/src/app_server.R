@@ -1,9 +1,12 @@
-# Server logic of the dream journal app.
+# Server logic of the Dream Journal app (originally Anna's reviewed app),
+# plus the colour-theme switch.
 
 #' Build the app server.
 #'
-#' @param journal_path CSV file the journal is read from and saved to.
-#' @param lexicons Output of `load_lexicons()`.
+#' @param journal_path CSV journal, read only when no state snapshot exists yet.
+#' @param state_path RDS snapshot with the journal and reviewed labels; every
+#'   save is written here.
+#' @param lexicon_dir Folder with the word lists.
 #' @return A Shiny server function.
 dream_app_server <- function(journal_path, lexicons) {
   function(input, output, session) {
