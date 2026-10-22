@@ -292,12 +292,35 @@ dream_app_ui <- function(lexicons) {
     sidebar = sidebar(
       width = 260,
       # Unchecked means the app shows personal data.
-      shiny::checkboxInput(
-        inputId = "demo_mode",
-        label = "Demo mode — show an example diary",
+      bslib::input_switch(
+        id = "demo_mode",
+        label = "Demo mode (off = self-analysis)",
         value = FALSE
       ),
       shiny::uiOutput("data_mode_status"),
+      shiny::conditionalPanel(
+        condition = "input.demo_mode === false",
+        
+        shiny::downloadButton(
+          "download_personal_csv", "Download diary CSV"
+        ),
+        
+        shiny::fileInput(
+          "upload_personal_csv",
+          "Upload my previous diary CSV",
+          accept = c(".csv", "text/csv")
+        ),
+        
+        shiny::checkboxInput(
+          "confirm_diary_replace",
+          "Replace my current session diary with this CSV",
+          FALSE
+        ),
+        
+        shiny::actionButton(
+          "load_personal_csv", "Load diary CSV"
+        )
+      ),
       dateRangeInput("period", "Period shown in the charts",
                      weekstart = 1, format = "d M yyyy"),
       radioButtons("bin", "Group charts by", inline = TRUE,

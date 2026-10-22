@@ -4,25 +4,16 @@
 #' Build the app server.
 #'
 #' @param journal_path CSV journal, read only when no state snapshot exists yet.
-#' @param state_path RDS snapshot with the journal and reviewed labels; every
-#'   save is written here.
-#' @param lexicon_dir Folder with the word lists.
 #' @return A Shiny server function.
 dream_app_server <- function(journal_path, lexicons) {
   function(input, output, session) {
     # Create one simulated diary per session, not on every toggle change.
     demo_journal <- simulate_dream_journal()
     
-    # Use the simulated table's columns/types as the empty-journal template.
-    # No simulated rows are copied into the personal journal.
-    initial_personal <- if (file.exists(journal_path)) {
-      read_journal(journal_path)
-    } else {
-      demo_journal[0, , drop = FALSE]
-    }
-    
-    personal_journal <- shiny::reactiveVal(initial_personal)
-    
+    # Personal entries are session-local; users upload a CSV to resume.
+    personal_journal <- shiny::reactiveVal(journal_template())
+      # Prevents app from loading a shared CSV project as someone's personal diary.
+  
     # Existing charts/search already read journal(), so they automatically
     # switch datasets without rewriting each individual output.
     journal <- shiny::reactive({
@@ -39,13 +30,38 @@ dream_app_server <- function(journal_path, lexicons) {
     
     output$data_mode_status <- shiny::renderUI({
       if (isTRUE(input$demo_mode)) {
-        shiny::helpText(
-          "Demo: this is a simulated diary, not your personal data. ",
-          "Switch Demo mode off to enter and analyse your own diary."
+        shiny::tagList(
+          shiny::strong("Demo mode"),
+          shiny::helpText(
+            "This diary is simulated and read-only. Switch Demo mode off ",
+            "to enter your own dreams or upload your earlier diary CSV."
+          )
         )
       } else {
-        shiny::helpText(
-          "Self-Analysis: entries and results use your personal diary."
+        shiny::tagList(
+          shiny::strong("Self-analysis: your personal diary"),
+          
+          shiny::helpText(
+            "Start empty or upload your previous diary CSV. Add each night ",
+            "and click Save entry. You can add several nights in one session."
+          ),
+          
+          shiny::helpText(
+            "Entries are kept in this session, not automatically saved to ",
+            "a permanent diary file. Download your updated CSV before closing ",
+            "or refreshing. Next time, upload it to continue adding nights."
+          ),
+          
+          shiny::helpText(
+            "Uploading replaces the current personal diary; it does not merge ",
+            "files. Download your current diary first if you want to keep it."
+          ),
+          
+          shiny::helpText(
+            "Downloaded CSVs contain private, unencrypted dream text. Keep ",
+            "them outside GitHub. For more private use, run locally in RStudio. ",
+            "Hosted apps process your entries and uploads on the server."
+          )
         )
       }
     })
@@ -87,6 +103,85 @@ dream_app_server <- function(journal_path, lexicons) {
       shiny::updateDateInput(session, "entry_date", value = next_entry)
     }, ignoreNULL = FALSE)
 
+    
+    output$download_personal_csv <- shiny::downloadHandler(
+      filename = function() {
+        paste0("personal-dream-journal-", Sys.Date(), ".csv")
+      },
+      contentType = "text/csv; charset=utf-8",
+      content = function(file) {
+        shiny::req(!isTRUE(input$demo_mode))
+        readr::write_csv(personal_journal(), file, na = "")
+      }
+    )
+    
+    shiny::observeEvent(input$load_personal_csv, {
+      if (isTRUE(input$demo_mode)) {
+        shiny::showNotification(
+          "Switch to Self-analysis before uploading.",
+          type = "warning"
+        )
+        return()
+      }
+      
+      if (is.null(input$upload_personal_csv)) {
+        shiny::showNotification("Choose a CSV first.", type = "warning")
+        return()
+      }
+      
+      if (!isTRUE(input$confirm_diary_replace)) {
+        shiny::showNotification(
+          "Confirm replacement of the current session diary first.",
+          type = "warning"
+        )
+        return()
+      }
+      
+      imported <- tryCatch(
+        read_personal_diary_csv(input$upload_personal_csv$datapath),
+        error = function(e) {
+          shiny::showNotification(
+            conditionMessage(e), type = "error", duration = 10
+          )
+          NULL
+        }
+      )
+      
+      if (is.null(imported)) return()
+      
+      # Replace only after validation succeeds.
+      personal_journal(imported)
+      
+      dates <- imported$date
+      first <- if (length(dates)) min(dates) else Sys.Date() - 30
+      last <- if (length(dates)) max(dates) else Sys.Date()
+      
+      shiny::updateDateRangeInput(
+        session, "period", start = first, end = last
+      )
+      shiny::updateDateInput(session, "cal_date", value = last)
+      shiny::updateDateInput(
+        session, "entry_date",
+        value = if (length(dates)) last + 1 else Sys.Date()
+      )
+      
+      shiny::updateTextAreaInput(session, "entry_text", value = "")
+      shiny::updateCheckboxGroupInput(
+        session, "entry_themes", selected = character()
+      )
+      shiny::updateCheckboxGroupInput(
+        session, "entry_emotions", selected = character()
+      )
+      shiny::updateCheckboxInput(
+        session, "confirm_diary_replace", value = FALSE
+      )
+      
+      shiny::showNotification(
+        "Diary loaded. Add more nights, then download the updated CSV.",
+        type = "message"
+      )
+    }, ignoreInit = TRUE)
+    
     in_period <- reactive({
       req(input$period)
       filter(scored(), date >= input$period[1], date <= input$period[2])
@@ -130,26 +225,13 @@ dream_app_server <- function(journal_path, lexicons) {
       # Always save to the personal dataset, never the displayed demo.
       replaced <- entry$date %in% personal_journal()$date
       updated_personal <- upsert_entry(personal_journal(), entry)
-      
-      # Ensure the destination folder exists before writing the CSV.
-      dir.create(dirname(journal_path), recursive = TRUE, showWarnings = FALSE)
-      
-      # Report write errors without claiming the entry was saved.
-      saved <- tryCatch({
-        write_journal(updated_personal, journal_path)
-        TRUE
-      }, error = function(e) {
-        shiny::showNotification(
-          paste("Could not save your diary:", conditionMessage(e)),
-          type = "error"
-        )
-        FALSE
-      })
-      shiny::req(saved)
       personal_journal(updated_personal)
       
       shiny::showNotification(
-        if (replaced) "Entry updated." else "Entry saved.",
+        if (replaced)
+          "Night updated in this session. Download your CSV before leaving."
+        else
+          "Night added to this session. Download your CSV before leaving.",
         type = "message"
       )
       
@@ -312,5 +394,69 @@ entry_card <- function(entry, highlight = NULL) {
                        entry$sleep_quality, entry$stress)),
     p(class = "mb-1", HTML(text)),
     if (tags_line != "") tags$small(class = "text-primary", tags_line)
+  )
+}
+
+# Uses eisting journal functions and preserves dream text, themes and emotions
+read_personal_diary_csv <- function(path) {
+  x <- readr::read_csv(
+    path,
+    col_types = journal_col_types(),
+    na = character(),
+    name_repair = "minimal",
+    show_col_types = FALSE
+  )
+  
+  if (nrow(readr::problems(x)) > 0) {
+    stop("The CSV contains invalid dates, numbers or malformed rows.")
+  }
+  
+  if (anyDuplicated(names(x))) {
+    stop("The CSV has duplicate column names.")
+  }
+  
+  required <- names(journal_template())
+  missing <- setdiff(required, names(x))
+  
+  if (length(missing)) {
+    stop(
+      "Missing columns: ", paste(missing, collapse = ", "),
+      ". Upload a diary CSV downloaded from this app."
+    )
+  }
+  
+  if (length(setdiff(names(x), required))) {
+    stop("This CSV uses a different diary format. Upload a CSV from this app.")
+  }
+  
+  if (anyNA(x$date) || anyDuplicated(x$date)) {
+    stop("Each night must have one valid, unique date.")
+  }
+  
+  if (any(!is_valid_clock(x$bedtime)) ||
+      any(!is_valid_clock(x$wake_time))) {
+    stop("Bedtime and wake time must use HH:MM, such as 23:30.")
+  }
+  
+  for (field in c("sleep_quality", "stress")) {
+    value <- x[[field]]
+    if (any(!is.finite(value) | value < 1 | value > 10 |
+            value != floor(value))) {
+      stop(field, " must contain whole numbers from 1 to 10.")
+    }
+  }
+  
+  for (field in c("dream_text", "themes", "emotions")) {
+    x[[field]][is.na(x[[field]])] <- ""
+  }
+  
+  # Recalculate derived hours from the validated times.
+  x$sleep_hours <- round(
+    sleep_duration_hours(x$bedtime, x$wake_time), 2
+  )
+  
+  dplyr::arrange(
+    dplyr::select(x, dplyr::all_of(required)),
+    date
   )
 }
