@@ -2,13 +2,14 @@
 
 #' Create the dream journal Shiny app.
 #'
-#' Entries and reviewed labels are kept in an RDS snapshot (`state_path`). If
-#' the snapshot does not exist, it is created from the CSV journal; if that
-#' does not exist either, the CSV is first made from `simulate_dream_journal()`
-#' when `simulate_if_missing` is TRUE.
+#' The demo journal and its reviewed labels are read from an RDS snapshot
+#' (`state_path`). If the snapshot does not exist, it is created from the CSV
+#' journal; if that does not exist either, the CSV is first made from
+#' `simulate_dream_journal()` when `simulate_if_missing` is TRUE. Personal
+#' entries are never written to the project (see src/personal_journal.R).
 #'
 #' @param journal_path CSV journal used to start a new snapshot.
-#' @param state_path RDS snapshot the app reads and saves to.
+#' @param state_path RDS snapshot with the demo journal.
 #' @param lexicon_dir Folder with the word lists.
 #' @param simulate_if_missing Seed a missing CSV journal with simulated nights.
 #' @param splash_seconds Minimum seconds the cloudy loading screen is shown;
@@ -28,15 +29,15 @@ dream_app <- function(journal_path = "data/dream_journal.csv",
     warning("No VAD lexicon is saved in this snapshot, so the emotion map stays empty.",
             call. = FALSE)
   }
-
+  
   ui <- dream_app_ui(splash_seconds = splash_seconds)
   if (isTRUE(state$simulation$synthetic)) {
     ui <- htmltools::tagList(
-      shiny::tags$div(
+      shiny::conditionalPanel("input.demo_mode", shiny::tags$div(
         style = "padding:10px 18px;background:#fff3cd;color:#664d03;border-bottom:1px solid #e6d49a;font-size:14px;",
         shiny::tags$strong("SYNTHETIC DATA \u2014 "),
         "Dreaming emotions come from the simulator. Waking responses are simulated separately. Entity confirmations are automatic, not human review."
-      ),
+      )),
       ui
     )
   }

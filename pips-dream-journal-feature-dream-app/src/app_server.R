@@ -4,8 +4,9 @@
 #' Build the app server.
 #'
 #' @param journal_path CSV journal, read only when no state snapshot exists yet.
-#' @param state_path RDS snapshot with the journal and reviewed labels; every
-#'   save is written here.
+#' @param state_path RDS snapshot with the demo journal and reviewed labels;
+#'   it is only read. Personal entries stay in the session (see
+#'   src/personal_journal.R).
 #' @param lexicon_dir Folder with the word lists.
 #' @return A Shiny server function.
 dream_app_server <- function(journal_path, state_path, lexicon_dir) {
@@ -28,12 +29,20 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
         })
         # Chart colours follow the selected colour theme.
         theme_name <- shiny::reactive(input$app_colour_theme %||% "lavender")
-        state <- shiny::reactiveVal(review_read_state(state_path, journal_path))
+        # Demo mode shows the read-only demo journal; otherwise the personal
+        # diary, which only lives in this session (Farah's privacy design).
+        demo_state <- review_read_state(state_path, journal_path)
+        personal <- shiny::reactiveVal(personal_empty_state(demo_state))
+        demo_mode <- shiny::reactive(!isFALSE(input$demo_mode))
+        state <- shiny::reactive(if (demo_mode()) demo_state else personal())
         editing <- shiny::reactiveVal(NULL)
         notify_error <- function(e) shiny::showNotification(conditionMessage(e), type = "error", duration = 8)
         persist <- function(s) {
-            review_write_state(s, state_path)
-            state(s)
+            if (demo_mode()) {
+                stop("The demo diary is read-only. Switch demo mode off to write your own diary.",
+                     call. = FALSE)
+            }
+            personal(s)
         }
         journal <- shiny::reactive(state()$journal)
         reviews <- shiny::reactive(state()$reviews)
@@ -60,8 +69,11 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
             shiny::updateSelectInput(session, "r_after_status", selected = "unanswered")
             shiny::updateCheckboxInput(session, "r_entities_confirmed", value = FALSE)
         }
-        shiny::observeEvent(TRUE, {
-            dates <- journal()$date
+        # Show the dates of the current diary at start, when switching demo
+        # mode and after loading a diary CSV.
+        reset_view <- function() {
+            clear_form()
+            dates <- shiny::isolate(journal())$date
             first <- if (length(dates)) 
                 min(dates)
             else Sys.Date() - 30
@@ -73,7 +85,10 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
                 shiny::updateDateRangeInput(session, id, start = last - 29, end = last)
             shiny::updateDateInput(session, "r_date", value = last + 1)
             shiny::updateDateInput(session, "r_cal_date", value = last)
-        }, once = TRUE)
+        }
+        shiny::observeEvent(demo_mode(), reset_view())
+        personal_mode_server(input, output, session, personal, demo_state, demo_mode,
+                             on_loaded = reset_view)
         shiny::observe({
             s <- state()
             choices <- list(r_codes = unique(c(review_unpack(s$reviews$codes), s$definitions$code)), 
@@ -303,7 +318,7 @@ dream_app_server <- function(journal_path, state_path, lexicon_dir) {
         output$r_after_summary <- shiny::renderText(review_status_summary(in_reviews(), "after"))
         matches <- shiny::reactive(review_vad_matches(in_reviews(), state()$vad))
         output$r_vad <- plotly::renderPlotly(review_vad_plot(matches(), input$r_vad_stage, state()$vad_limits,
-            colour = get_dream_theme(theme_name())$accent[1]))
+            theme = theme_name()))
         output$r_coverage <- shiny::renderText({
             x <- dplyr::filter(matches(), stage == input$r_vad_stage)
             if (!nrow(state()$vad)) 
