@@ -57,7 +57,8 @@ renv::restore() # run in the console
 renv::status() # run in the console and check if the packages are installed. if not, run renv::restore() again.
 
 ```
-If the error *Error: attempt to use zero-length variable name*, run the renv::restore in the console.
+If the error *Error: attempt to use zero-length variable name*, run renv::restore in the console.
+
 ### 4. Read the report
 
 Open `main.qmd` and click **Render**. The report opens as a web page.
@@ -71,8 +72,7 @@ source("src/setup.R")
 run_dream_app()
 ```
 
-The app opens in your browser or the RStudio viewer. Stop it with the red
-**Stop** button in the console.
+The app opens in your browser or the RStudio viewer. Stop it with the red **Stop** button in the console.
 
 ## Structure
 
@@ -103,9 +103,81 @@ Keep supporting files in their existing folders.
 
 ## Tests
 
-``` r
+The project has unit tests (51 tests in 13 files) in `tests/testthat/`,
+written with the [testthat](https://testthat.r-lib.org) package. They check
+that the analysis, the simulation and the app's building blocks work as
+intended, and that the app handles missing or wrong input with clear
+messages instead of crashing.
+
+### Run the tests
+
+Open the project (`PIPS_dream_diary.Rproj`), make sure the packages are
+installed (`renv::restore()`), and run in the R console:
+
+```r
 testthat::test_dir("tests/testthat")
 ```
+
+All tests pass when the summary at the end shows `FAIL 0`.
+
+### What the tests check
+
+| File | What it tests |
+|------|---------------|
+| `test-analysis.R` | The logistic regression: data preparation, finding a built-in stress effect, friendly errors with too little data, APA-style p-values |
+| `test-simulate_and_recommend.R` | The simulation is reproducible and stays in valid ranges, stress makes negative dreams more likely, and sleep tips react to short or irregular sleep |
+| `test-personal_journal.R` | Privacy and demo mode: the demo journal is read-only, personal entries stay in the session, and a downloaded diary can be uploaded again |
+| `test-journal_io.R` | Saving and reading journal entries, readable errors for invalid entries, and bedtimes after midnight |
+| `test-review.R` | Reviewed labels: emotions while dreaming and after waking, people/animals/objects, and the emotion (VAD) map |
+| `test-text_features.R` | Word-list matching: themes, emotions, people and objects are found as whole words only, and every word in the simulated dreams is in the word lists |
+| `test-app.R` | The app starts from the saved snapshot, rebuilds a missing snapshot, and has its loading screen and colour menu |
+| `test-period_tabs.R` | Period choices on the Dream themes and Your patterns tabs work independently and handle periods without nights |
+| `test-theme_clouds.R` | Theme clouds count per night and grow with frequency |
+| `test-calendar_widget.R` | The calendar shows the right days in day, week and month view |
+| `test-sleep_view.R` | Sleep statistics, tips and the shareable story picture |
+| `test-dream_themes.R` | The colour themes (lavender, ocean, forest) and charts with or without data |
+| `test-splash_screen.R` | The cloudy loading screen |
+
+`tests/testthat/helper-load.R` loads the project before the tests run.
+
+
+## Dependencies
+
+### Software
+
+| Software | Version | Needed for |
+|----------|---------|------------|
+| [R](https://cran.r-project.org) | ≥ 4.4.1 (lockfile made with 4.6.1) | Running the app and the analysis |
+| [RStudio](https://posit.co/download/rstudio-desktop/) | recent | Opening the project (`PIPS_dream_diary.Rproj`) |
+| [Quarto](https://quarto.org) | included with recent RStudio | Rendering `main.qmd` |
+
+### R packages
+
+All package versions are recorded in `renv.lock` and installed with
+`renv::restore()` (see *Run*). The packages the project uses directly are:
+
+| Package | Used for |
+|---------|----------|
+| `shiny` | The app itself |
+| `bslib` | App layout (tabs, cards, sidebar) and the colour themes |
+| `dplyr`, `tidyr`, `tibble` | Preparing and reshaping the journal data |
+| `readr` | Reading and writing journal CSVs and the word lists |
+| `stringr` | Matching words in dream texts |
+| `lubridate` | Dates and weekdays (e.g. the weekly stress rhythm in the simulation) |
+| `ggplot2`, `scales` | Charts in the app and the report |
+| `plotly` | The interactive 3D emotion map |
+| `htmltools` | Building the calendar, theme clouds and other HTML parts of the app |
+| `purrr` | Helper functions for working with lists |
+| `knitr`, `rmarkdown` | Rendering `main.qmd` and its tables |
+| `testthat` | Unit tests in `tests/testthat/` |
+| `renv` | Installing the exact package versions from `renv.lock` |
+
+The lockfile lists more packages than this (about 128): these are the
+packages above plus the packages *they* depend on, which renv installs
+automatically.
+
+`src/setup.R` checks at start-up that the app's packages are installed and
+names any that are missing.
 
 ## Limitations
 
