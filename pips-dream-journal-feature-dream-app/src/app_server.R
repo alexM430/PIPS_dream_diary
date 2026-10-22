@@ -8,7 +8,7 @@
 dream_app_server <- function(journal_path, lexicons) {
   function(input, output, session) {
     # Each preset defines an accent, page background, and text colour.
-    colour_presets &lt;- list(
+    colour_presets <- list(
       lavender = list(
         primary = "#5B4B8A",
         bg = "#FBFAFD",
@@ -32,10 +32,10 @@ dream_app_server <- function(journal_path, lexicons) {
       
       # Ignore unexpected values rather than trying to use an invalid preset.
       shiny::req(input$app_colour_theme %in% names(colour_presets))
-      colours &lt;- colour_presets[[input$app_colour_theme]]
+      colours <- colour_presets[[input$app_colour_theme]]
       
       # Preserve the existing Bootstrap theme and update its colours.
-      updated_theme &lt;- bslib::bs_theme_update(
+      updated_theme <- bslib::bs_theme_update(
         session$getCurrentTheme(),
         primary = colours$primary,
         bg = colours$bg,
