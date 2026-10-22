@@ -7,7 +7,7 @@
   overflow: hidden;
   cursor: pointer;
   font-family: "Quicksand", "Nunito", system-ui, sans-serif;
-  background: linear-gradient(170deg, #D9C8FF 0%, #F6D3EC 45%, #FFE3D3 100%);
+  background: linear-gradient(170deg, var(--dream-sky-1) 0%, var(--dream-sky-2) 45%, var(--dream-sky-3) 100%);
   transition: opacity 1.2s ease 0.6s, visibility 0s linear 1.8s;
 }
 #dream-splash.is-clearing { opacity: 0; visibility: hidden; }
@@ -68,7 +68,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #5B4B8A;
+  color: var(--dream-ink);
   transition: opacity .8s ease, transform .8s ease;
 }
 #dream-splash.is-clearing .splash-center { opacity: 0; transform: translateY(-24px); }
@@ -78,7 +78,7 @@
   font-size: clamp(2.4rem, 7vw, 4.4rem);
   font-weight: 700;
   margin: 8px 0 4px;
-  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  background: linear-gradient(90deg, var(--dream-accent-1), var(--dream-accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

@@ -28,8 +28,10 @@ bar_linewidth <- function(n_nights) min(6, 55 / max(n_nights, 1))
 #'
 #' @param nights Journal rows to show.
 #' @param target_hours Recommended sleep range in hours.
+#' @param theme Colour theme name (see `dream_themes`).
 #' @return A ggplot.
-plot_sleep_hours <- function(nights, target_hours = c(7, 9)) {
+plot_sleep_hours <- function(nights, target_hours = c(7, 9), theme = "lavender") {
+  t <- get_dream_theme(theme)
   if (nrow(nights) == 0) return(empty_plot("No nights logged yet."))
   width <- bar_linewidth(nrow(nights))
   nights <- nights |>
@@ -38,15 +40,15 @@ plot_sleep_hours <- function(nights, target_hours = c(7, 9)) {
       sleep_hours > target_hours[2] ~ "extra long",
       TRUE ~ "in the dream zone"
     ))
-  zone_colours <- c("in the dream zone" = "#B794F6", "a bit short" = "#F9A8D4",
-                    "extra long" = "#93C5FD")
+  zone_colours <- c("in the dream zone" = t$charts[1], "a bit short" = t$charts[2],
+                    "extra long" = t$charts[3])
 
   ggplot(nights, aes(date, sleep_hours, colour = zone)) +
     annotate("rect", xmin = min(nights$date) - 1, xmax = max(nights$date) + 1,
              ymin = target_hours[1],
-             ymax = target_hours[2], fill = "#FBE3F1", alpha = 0.7) +
+             ymax = target_hours[2], fill = t$sky[2], alpha = 0.9) +
     annotate("text", x = min(nights$date), y = target_hours[2], vjust = -0.5,
-             hjust = 0, label = "dream zone", colour = "#D16BA5", size = 3.6,
+             hjust = 0, label = "dream zone", colour = t$accent[2], size = 3.6,
              fontface = "bold") +
     geom_segment(aes(xend = date, y = 0, yend = sleep_hours),
                  linewidth = width, lineend = "round") +
@@ -65,7 +67,8 @@ plot_sleep_hours <- function(nights, target_hours = c(7, 9)) {
 #'
 #' @param nights Journal rows to show.
 #' @return A ggplot with evening at the top and morning at the bottom.
-plot_sleep_windows <- function(nights) {
+plot_sleep_windows <- function(nights, theme = "lavender") {
+  t <- get_dream_theme(theme)
   if (nrow(nights) == 0) return(empty_plot("No nights logged yet."))
   width <- bar_linewidth(nrow(nights))
   nights <- nights |>
@@ -75,14 +78,14 @@ plot_sleep_windows <- function(nights) {
   ggplot(nights, aes(date)) +
     geom_segment(aes(xend = date, y = bed, yend = wake, colour = sleep_quality),
                  linewidth = width, lineend = "round") +
-    geom_point(aes(y = bed), colour = "#7C5CC4", size = width * 0.6) +
+    geom_point(aes(y = bed), colour = t$accent[1], size = width * 0.6) +
     geom_point(aes(y = wake), colour = "#F5B700", size = width * 0.6) +
-    scale_colour_gradient(low = "#C7D2FE", high = "#F472B6", limits = c(1, 10),
+    scale_colour_gradient(low = t$soft[1], high = t$accent[2], limits = c(1, 10),
                           name = "sleep quality") +
     scale_y_reverse(breaks = hour_breaks, labels = evening_hours_to_clock(hour_breaks)) +
     labs(x = NULL, y = NULL,
          title = "When you slept",
-         subtitle = "Purple dot = bedtime, yellow dot = wake-up") +
+         subtitle = "Dark dot = bedtime, yellow dot = wake-up") +
     dreamy_plot_theme() +
     guides(colour = guide_colourbar(barwidth = 10, barheight = 0.6))
 }
