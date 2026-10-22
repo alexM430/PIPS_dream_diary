@@ -33,7 +33,15 @@ The sidebar also has an *App colour theme* menu (lavender, ocean, forest).
 ### 1. Clone the repository
 git clone https://github.com/alexM430/PIPS_dream_diary
 
-### 2. Install packages
+### 2. Open the project 
+Double-click **`PIPS_dream_diary.Rproj`**. RStudio opens in the right folder,
+and renv sets itself up automatically (the first time this can take a
+minute).
+
+Not using RStudio? Start R in the `PIPS_dream_diary` folder instead, or run
+`setwd("path/to/PIPS_dream_diary")`.
+
+### 3. Install packages
 
 ``` r
 install.packages("renv") # Only the first time
@@ -48,9 +56,9 @@ install.packages(c(
 renv::snapshot()
 
 ```
+### 4. Open main.qmd and try the app
+Open main.qmd, click render and follow the steps explained.
 
-Open the repository folder in RStudio, then open main.qmd and follow the steps explained.
-Keep `data/reviewed_dream_journal.rds` included: it contains the saved entries, reviewed labels and emotion lexicon. No demo generation or lexicon import is required.
 
 ## Structure
 
