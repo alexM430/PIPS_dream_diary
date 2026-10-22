@@ -7,8 +7,6 @@ The app has a demo-mode, in which one can see a logged journal of 180 nights, wi
 To use the app in its personal mode, one can flip the toggle and start filling in their sleep pattern. In order to avoid the hassle of making an account, the user-entered data is stored locally, and users are asked to download their diary.
 Users can reupload their diary at a later moment to continue filling it in. 
 
-Includes a synthetic journal of 180 nights, simulated reviewed labels, and an imported emotion lexicon.
-
 ## Requirements
 
 Requires R ≥ 4.4.1 to render `main.qmd`.
