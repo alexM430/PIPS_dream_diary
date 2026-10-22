@@ -21,45 +21,6 @@ label_colours <- function(labels, theme = "lavender") {
     stats::setNames(dream_chart_colours(length(labels), theme), labels)
 }
 
-#' Heat map of content codes over time: each code has its own colour and
-#' darker tiles mean the code appeared on a larger share of logged nights.
-.review_base_heatmap <- function(journal, reviews, period = "week", theme = "lavender") {
-    period <- match.arg(period, c("week", "month"))
-    x <- review_long(reviews, "codes")
-    if (!nrow(x)) {
-        return(empty_plot("Add your own content codes to entries first."))
-    }
-    periods <- seq(lubridate::floor_date(min(journal$date), period, week_start = 1),
-                   lubridate::floor_date(max(journal$date), period, week_start = 1), by = period)
-    denominators <- dplyr::count(dplyr::mutate(journal, period_start = lubridate::floor_date(date,
-        .env$period, week_start = 1)), period_start, name = "logged")
-    counts <- x |>
-        dplyr::mutate(period_start = lubridate::floor_date(date, .env$period, week_start = 1)) |>
-        dplyr::count(period_start, label, name = "nights") |>
-        tidyr::complete(period_start = .env$periods, label, fill = list(nights = 0L)) |>
-        dplyr::left_join(denominators, by = "period_start") |>
-        dplyr::mutate(rate = nights / logged)
-    order <- counts |>
-        dplyr::group_by(label) |>
-        dplyr::summarise(total = sum(nights), .groups = "drop") |>
-        dplyr::arrange(total, dplyr::desc(label)) |>
-        dplyr::pull(label)
-    counts$label <- factor(counts$label, levels = order)
-    ggplot2::ggplot(counts, ggplot2::aes(period_start, label)) +
-        ggplot2::geom_tile(ggplot2::aes(fill = label, alpha = rate), colour = "white",
-                           linewidth = 1.2, na.rm = TRUE) +
-        ggplot2::geom_text(ggplot2::aes(label = ifelse(is.na(logged), "\u00B7",
-            ifelse(nights > 0, as.character(nights), ""))), size = 3.2, colour = dream_ink) +
-        ggplot2::scale_fill_manual(values = label_colours(rev(order), theme), guide = "none") +
-        # Shade relative to the busiest tile so typical weeks are clearly visible.
-        ggplot2::scale_alpha_continuous(range = c(0.12, 1), limits = c(0, max(c(counts$rate, 0.01), na.rm = TRUE)),
-            na.value = 0, guide = "none") +
-        ggplot2::scale_x_date(expand = c(0, 0)) +
-        ggplot2::labs(x = NULL, y = NULL, title = paste("Your dream themes per", period),
-            subtitle = "Numbers = nights with that theme. Darker = more of that week's nights.") +
-        dreamy_plot_theme()
-}
-
 #' Stress the day before, on nights with each content code.
 .review_base_stress <- function(journal, reviews, theme = "lavender") {
     x <- dplyr::filter(dplyr::left_join(review_long(reviews, "codes"),
@@ -165,12 +126,6 @@ plot_emotion_butterfly <- function(counts, order = NULL, theme = "lavender") {
         dreamy_plot_theme() +
         ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
                        panel.grid.major.x = ggplot2::element_line(colour = "#E9DDF7", linetype = "dashed"))
-}
-
-review_heatmap <- function(journal, reviews, period = "week", top = "all", theme = "lavender") {
-    if (!nrow(journal))
-        return(empty_plot("No logged nights in this period."))
-    .review_base_heatmap(journal, .review_select_chart_codes(reviews, top), period, theme)
 }
 
 review_stress_plot <- function(journal, reviews, top = "all", theme = "lavender") {

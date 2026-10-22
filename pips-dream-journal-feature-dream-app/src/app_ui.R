@@ -95,12 +95,30 @@ entry_tab <- function() {
   )
 }
 
+# Period buttons (last week/month/year, all, custom) with a custom date range
+# that only shows for "Custom". Inputs: <prefix>_window and <prefix>_range;
+# output <prefix>_period_text describes the chosen dates.
+period_picker <- function(prefix, selected = "30") {
+  window_id <- paste0(prefix, "_window")
+  shiny::div(class = "theme-period",
+    shiny::div(class = "dream-pills",
+      shiny::radioButtons(window_id, NULL, inline = TRUE, selected = selected,
+                          c("Last week" = "7", "Last month" = "30", "Last year" = "365",
+                            "All" = "all", "Custom" = "custom"))),
+    shiny::conditionalPanel(sprintf("input.%s == 'custom'", window_id),
+      shiny::dateRangeInput(paste0(prefix, "_range"), NULL, weekstart = 1, width = "280px")),
+    shiny::span(class = "dream-hint", shiny::textOutput(paste0(prefix, "_period_text"), inline = TRUE)))
+}
+
 themes_tab <- function() {
   bslib::nav_panel(
     "\U0001F52E Dream themes",
-    tab_title("Your dream themes", "What your dreams are about, and how that changes over time."),
+    tab_title("Your dream themes", "What your dreams are about. Bigger clouds = themes that came up more often."),
+    period_picker("r_theme"),
     shiny::uiOutput("r_theme_overview"),
-    bslib::card(fill = FALSE, full_screen = TRUE, shiny::plotOutput("r_heatmap", height = "430px")),
+    bslib::card(fill = FALSE, class = "theme-sky", shiny::uiOutput("r_theme_clouds"),
+                shiny::p(class = "dream-hint text-center mb-0",
+                         "Tap a cloud to read the dreams with that theme.")),
     bslib::layout_columns(
       col_widths = c(7, 5), fill = FALSE,
       bslib::card(fill = FALSE, full_screen = TRUE, shiny::plotOutput("r_code_stress", height = "430px")),
@@ -131,6 +149,30 @@ emotions_tab <- function() {
                 plotly::plotlyOutput("r_vad", height = "450px"),
                 shiny::p(class = "dream-hint", shiny::textOutput("r_coverage", inline = TRUE)),
                 shiny::tableOutput("r_unmatched"))
+  )
+}
+
+patterns_tab <- function() {
+  bslib::nav_panel(
+    "\U0001F4CA Your patterns",
+    tab_title("Your patterns",
+              "Do stressful days and short nights make negative dreams more likely? A statistical test on your own journal."),
+    period_picker("r_pattern", selected = "all"),
+    shiny::uiOutput("r_pattern_overview"),
+    bslib::card(fill = FALSE, full_screen = TRUE,
+      shiny::plotOutput("r_pattern_plot", height = "440px")),
+    bslib::layout_columns(
+      col_widths = c(7, 5), fill = FALSE,
+      bslib::card(fill = FALSE,
+        bslib::card_header("\U0001F4AC What this means"),
+        shiny::uiOutput("r_pattern_text")),
+      bslib::card(fill = FALSE,
+        bslib::card_header("\U0001F9EA How it works"),
+        shiny::tags$ul(class = "dream-hint mb-0",
+          shiny::tags$li("Each night with feelings \u201Cwhile dreaming\u201D counts once."),
+          shiny::tags$li("A dream is negative when its feelings are, on average, unpleasant in the NRC VAD lexicon."),
+          shiny::tags$li("A logistic regression estimates how stress and hours slept change the odds of a negative dream."),
+          shiny::tags$li("This shows an association for one person, not a cause."))))
   )
 }
 
@@ -251,26 +293,12 @@ settings_tab <- function() {
                   shiny::p(class = "dream-hint mt-2",
                            "Names only affect future suggestions; old entries are not changed.")),
       bslib::card(fill = FALSE,
-                  bslib::card_header("\U0001F30C Import the NRC VAD emotion lexicon"),
-                  shiny::tags$a(href = "https://saifmohammad.com/WebPages/nrc-vad.html", target = "_blank",
-                                "Official NRC VAD download and usage terms"),
-                  shiny::p(class = "dream-hint mt-2",
-                           "Prepare a UTF-8 CSV with columns term, valence, arousal, dominance (mean scores)."),
-                  shiny::fileInput("r_vad_file", "Prepared VAD CSV", accept = ".csv"),
-                  shiny::selectInput("r_vad_scale", "Score scale (check your file)",
-                                     stats::setNames(c("signed", "unit"), c("\u22121 to +1", "0 to 1"))),
-                  shiny::textInput("r_vad_source", "Source / citation", "NRC VAD Lexicon v2 \u2014 Mohammad (2025)"),
-                  shiny::checkboxInput("r_vad_confirm",
-                                       "I checked the file version, score scale, columns and usage terms", FALSE),
-                  shiny::actionButton("r_import_vad", "Import lexicon"),
-                  shiny::p(class = "dream-hint mt-2", shiny::textOutput("r_vad_info", inline = TRUE))),
-      bslib::card(fill = FALSE,
-                  bslib::card_header("\U0001F4E6 Export"),
-                  shiny::div(class = "dream-actions",
-                             shiny::downloadButton("r_export", "Export as CSV"),
-                             shiny::downloadButton("r_snapshot", "Download full backup (.rds)")),
-                  shiny::p(class = "dream-hint",
-                           "Exports contain your private dream texts \u2014 don't upload them to GitHub.")))
+        bslib::card_header("\U0001F4E6 Export"),
+        shiny::div(class = "dream-actions",
+                   shiny::downloadButton("r_export", "Export as CSV"),
+                   shiny::downloadButton("r_snapshot", "Download full backup (.rds)")),
+        shiny::p(class = "dream-hint",
+                 "Exports contain your private dream texts \u2014 don't upload them to GitHub.")))
   )
 }
 
@@ -306,8 +334,7 @@ dream_app_ui <- function(css_paths = c("src/www/dream_calendar.css", "src/www/sl
                          selected = "lavender"),
       personal_mode_sidebar(),
       shiny::dateRangeInput("r_period", "\U0001F4C6 Dates shown in the charts", weekstart = 1),
-      shiny::radioButtons("r_bin", "Group the theme map by",
-                          choices = c(Week = "week", Month = "month"), inline = TRUE),
+      shiny::p(class = "dream-hint", "The Dream themes tab has its own period picker."),
       shiny::selectInput("r_top", "Labels per chart",
                          c("Top 10" = "10", "Top 20" = "20", All = "all")),
       shiny::p(class = "dream-hint",
@@ -315,6 +342,7 @@ dream_app_ui <- function(css_paths = c("src/www/dream_calendar.css", "src/www/sl
     entry_tab(),
     themes_tab(),
     emotions_tab(),
+    patterns_tab(),
     people_tab(),
     calendar_tab(),
     sleep_tab(),

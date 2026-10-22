@@ -43,13 +43,6 @@ test_that("VAD uses complete labels and excludes unmatched terms only from scori
     x <- review_vad_matches(r, vad)
     expect_equal(nrow(x), 2L)
     expect_true(is.na(x$valence[x$label == "very happy"]))
-    file <- tempfile(fileext = ".csv")
-    on.exit(unlink(file), add = TRUE)
-    readr::write_csv(vad, file)
-    expect_equal(nrow(review_import_vad(file, c(-1, 1))), 1L)
-    vad$dominance <- 5
-    readr::write_csv(vad, file)
-    expect_error(review_import_vad(file, c(-1, 1)))
 })
 
 test_that("snapshot round-trip preserves original journal fields", {
@@ -67,4 +60,25 @@ test_that("frequency plot keeps common order and zero bars", {
     p <- review_frequency_plot(x, "Test", order = c("happy", "sad"), limit = 3)
     expect_no_error(ggplot2::ggplot_build(p))
     expect_s3_class(review_frequency_plot(x[0, ], "Empty"), "ggplot")
+})
+
+
+test_that("feelings fall into the right emotion region", {
+  expect_equal(vad_region(c(0.8, 0.6, -0.7, -0.7, -0.7), c(0.5, -0.6, 0.6, 0.8, -0.5),
+                          c(0.3, 0.2, 0.4, -0.4, -0.3)),
+               c("joy", "calm", "anger", "fear", "sadness"))
+  expect_equal(vad_region(0.6, 0.4, 0.7, mid = 0.5), "calm")  # 0-1 scale
+})
+
+test_that("the emotion map draws one labelled cluster per region", {
+  r <- bind_rows(review_row("2026-01-01"), review_row("2026-01-02"))
+  r$during <- c("happy;scared", "scared")
+  r$during_status <- "reported"
+  vad <- tibble::tibble(term = c("happy", "scared"), valence = c(0.9, -0.8),
+                        arousal = c(0.5, 0.7), dominance = c(0.4, -0.5))
+  p <- plotly::plotly_build(review_vad_plot(review_vad_matches(r, vad), "during", c(-1, 1), theme = "ocean"))
+  tags <- vapply(p$x$layout$scene$annotations, `[[`, "", "text")
+  expect_length(tags, 2)
+  expect_true(any(grepl("Joy", tags)) && any(grepl("Fear", tags)))
+  expect_s3_class(review_vad_plot(r[0, ] |> review_vad_matches(vad), "during", c(-1, 1)), "plotly")
 })

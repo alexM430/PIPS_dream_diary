@@ -38,6 +38,85 @@ journal_path <- "data/dream_journal.csv"
 if (!file.exists(journal_path)) write_journal(journal, journal_path)
 ```
 
+## Analysis: do stress and short sleep make negative dreams more likely?
+
+According to the continuity hypothesis, dreams reflect waking-life
+experiences and concerns (Schredl & Hofmann, 2003). Stressful days should
+therefore be followed by more unpleasant dreams, and stress is indeed linked
+to more frequent nightmares (Schredl, 2003). Sleep loss, in turn, makes
+emotional processing more negative (Walker & van der Helm, 2009). We test
+both predictors in the dreamer's journal:
+
+> **Research question:** Does more stress the day before, and less sleep,
+> increase the chance that a dream is negative?
+
+### Data
+
+We use the journal snapshot the app works with
+(`data/reviewed_dream_journal.rds`). For every night with feelings reported
+*while dreaming*, we look up each feeling in the NRC VAD lexicon (Mohammad,
+2025), which rates words from unpleasant (−1) to pleasant (+1). A dream counts
+as **negative** when the average valence of its feelings is below 0.
+
+```{r}
+snapshot <- readRDS("data/reviewed_dream_journal.rds")
+dreams <- dream_analysis_data(snapshot$journal, snapshot$reviews, snapshot$vad)
+head(dreams)
+```
+
+`r nrow(dreams)` nights have feelings found in the lexicon;
+`r round(100 * mean(dreams$negative))`% of these dreams were negative.
+
+### Model
+
+The outcome is binary (negative dream: yes/no), so we fit a **logistic
+regression** with stress the day before (1–10) and hours slept as predictors.
+Odds ratios above 1 mean the predictor goes with *more* negative dreams.
+
+```{r}
+model <- fit_negative_dream_model(dreams)
+results <- negative_dream_results(model)
+results$p_value <- vapply(results$p_value, format_p, character(1))
+knitr::kable(results, digits = 2,
+             col.names = c("Predictor", "Odds ratio", "95% CI low", "95% CI high", "p"))
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 5
+plot_negative_dream_model(model)
+```
+
+### Interpretation
+
+```{r}
+#| echo: false
+#| results: asis
+cat(paste("-", describe_negative_dream_model(model)), sep = "\n")
+```
+
+The figure shows the chance of a negative dream predicted by the model for
+6 and 8 hours of sleep: it rises steeply with stress, while the two sleep
+lines lie close together. Stress and sleep are related in these data
+(*r* = `r round(cor(dreams$stress, dreams$sleep_hours), 2)`), so part of any
+sleep effect may be absorbed by stress.
+
+**Limitations.** The data are simulated: `simulate_dream_journal()` builds in
+effects of both stress (odds ratio ≈ `r round(exp(0.45), 2)` per point) and
+sleep (≈ `r round(exp(-0.5), 2)` per hour) on negative dreams. The model
+recovers the stress effect, which mainly shows that the method works. It does
+not detect the sleep effect: sleep varies little in these nights
+(SD = `r round(sd(dreams$sleep_hours), 2)` h vs. `r round(sd(dreams$stress), 2)`
+stress points) and overlaps with stress, so `r nrow(dreams)` nights give too
+little power to separate the two. All nights come from one person and are not
+independent of each other (e.g. stressful weeks), the outcome depends on how
+well the lexicon captures the reported feelings, and the result is an
+association, not proof of cause. With real diaries from several people, a
+multilevel model with nights nested in dreamers would be the next step.
+
+The app's **Your patterns** tab runs this same analysis on the user's own
+journal for any period.
+
 ## The app
 
 Run the chunk below in RStudio (or `source("src/setup.R"); run_dream_app()` in
@@ -46,14 +125,15 @@ loading screen shows for a few seconds; tap it to skip.
 
 | Tab | What it shows |
 |-----|---------------|
-| Entry / review | Write or edit a night; label content codes, emotions during the dream and after waking, and confirm suggested people, animals and objects |
-| Content codes | Heat map of your codes over time and stress on nights with each code |
-| Emotions | Emotions during dreaming vs. after waking, and an optional 3D valence-arousal-dominance map |
-| People, animals & objects | Who and what recur in confirmed entries |
+| New dream | Write or edit a night step by step: sleep, dream text, feelings while dreaming and after waking, themes, and the people, animals and objects that appeared |
+| Dream themes | Themes as clouds (bigger = more frequent) for the last week, month, year, all nights or a custom period, plus stress per theme |
+| Emotions | Feelings while dreaming vs. after waking, and an optional 3D valence-arousal-dominance map |
+| Your patterns | The analysis above, run on your own journal |
+| People & things | Who and what recur in confirmed entries |
 | Calendar | Day, week or month view, coloured by sleep quality, stress or hours slept |
 | Sleep | Sleep ring, stats, charts, tips and a shareable story picture |
 | Search | Search dream text and all labels |
-| Settings / export | Code definitions, renaming labels, remembered names, lexicon import, export |
+| Settings | Theme definitions, renaming labels, remembered names, export |
 
 The sidebar also has an *App colour theme* menu (lavender, ocean, forest).
 
@@ -68,6 +148,15 @@ dominance for over 55k English terms. <https://saifmohammad.com/WebPages/nrc-vad
 
 Russell, J. A. (1980). A circumplex model of affect. *Journal of Personality
 and Social Psychology, 39*(6), 1161–1178.
+
+Schredl, M. (2003). Effects of state and trait factors on nightmare frequency.
+*European Archives of Psychiatry and Clinical Neuroscience, 253*(5), 241–247.
+
+Schredl, M., & Hofmann, F. (2003). Continuity between waking activities and
+dream activities. *Consciousness and Cognition, 12*(2), 298–308.
+
+Walker, M. P., & van der Helm, E. (2009). Overnight therapy? The role of sleep
+in emotional brain processing. *Psychological Bulletin, 135*(5), 731–748.
 
 ```{r}
 #| echo: false

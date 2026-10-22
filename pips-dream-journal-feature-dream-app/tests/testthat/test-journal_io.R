@@ -21,6 +21,9 @@ test_that("saving a night twice replaces the first entry", {
 test_that("a journal survives a write/read round trip", {
   path <- tempfile(fileext = ".csv")
   journal <- simulate_dream_journal(n_nights = 10)
+  # The simulation's provenance attribute is metadata, not diary data; CSV
+  # files do not store it.
+  attr(journal, "simulation") <- NULL
   write_journal(journal, path)
   expect_equal(read_journal(path), journal, ignore_attr = TRUE)
   expect_equal(nrow(read_journal(tempfile())), 0)
