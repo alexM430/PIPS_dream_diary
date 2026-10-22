@@ -1,109 +1,158 @@
-# APPEND this entire block to the END of src/review_vad.R.
-# It replaces the earlier theme helper, not your data/import functions.
+# review_vad.R
 
-.review_vad_theme <- function(p) {
-  htmlwidgets::onRender(p, '
-function(el) {
-  if (el.__dreamVadCleanup) el.__dreamVadCleanup();
-  var timer, alive = true, lastKey = "", busy = false;
-  var palettes = {
-    lavender: {point: "#B18AF0", grid: "#C0ADD9", text: "#514365", muted: "#88759F"},
-    ocean: {point: "#4BAFCB", grid: "#91BDCB", text: "#284F60", muted: "#608591"},
-    forest: {point: "#76AE8A", grid: "#A0BEA9", text: "#354F40", muted: "#6B8976"}
-  };
-  function themeName() {
-    var selects = document.querySelectorAll("select");
-    for (var i = 0; i < selects.length; i++) {
-      var all = Array.from(selects[i].options).map(function(o) {
-        return (o.text + " " + o.value).toLowerCase();
-      }).join(" ");
-      if (all.includes("lavender") && all.includes("ocean") && all.includes("forest")) {
-        var option = selects[i].options[selects[i].selectedIndex];
-        var selected = option ? (option.text + " " + option.value).toLowerCase() : "";
-        if (selected.includes("ocean")) return "ocean";
-        if (selected.includes("forest")) return "forest";
-        return "lavender";
-      }
-    }
-    return "lavender";
+# Optional valence-arousal-dominance (VAD) emotion map, based on an imported
+# NRC VAD v2 lexicon (Mohammad, 2025).
+
+.review_base_vad <- function(matches, stage, limits) {
+  x <- dplyr::filter(
+    matches,
+    .data$stage == .env$stage,
+    is.finite(valence),
+    is.finite(arousal),
+    is.finite(dominance)
+  )
+  
+  if (!nrow(x)) {
+    return(plotly::layout(
+      plotly::plot_ly(),
+      annotations = list(list(
+        text = "No matched emotion labels for this stage. Import NRC VAD v2 under Settings.",
+        x = 0.5,
+        y = 0.5,
+        xref = "paper",
+        yref = "paper",
+        showarrow = FALSE
+      ))
+    ))
   }
-  function cardBackground() {
-    // Find the actual enclosing card surface, rather than the plot canvas.
-    var card = el.closest(".card, .bslib-card");
-    var node = card ? (card.querySelector(".card-body") || card) : el.parentElement;
-    while (node) {
-      var color = getComputedStyle(node).backgroundColor;
-      if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") return color;
-      node = node.parentElement;
-    }
-    return "rgb(250, 249, 253)";
-  }
-  function apply() {
-    if (!alive || !el.isConnected || !window.Plotly || busy) return;
-    var name = themeName(), palette = palettes[name];
-    var bg = cardBackground();
-    var family = getComputedStyle(document.body).fontFamily;
-    var key = name + bg + family;
-    if (key === lastKey) return;
-    busy = true;
-    var update = {
-      "paper_bgcolor": bg,
-      "plot_bgcolor": bg,
-      "scene.bgcolor": bg,
-      "font.family": family,
-      "font.color": palette.text,
-      "hoverlabel.bgcolor": bg,
-      "hoverlabel.bordercolor": palette.point,
-      "hoverlabel.font.color": palette.text,
-      "margin.l": 45, "margin.r": 45,
-      "margin.b": 55, "margin.t": 20
-    };
-    ["xaxis", "yaxis", "zaxis"].forEach(function(axis) {
-      var prefix = "scene." + axis + ".";
-      update[prefix + "showgrid"] = true;
-      // Solid colours avoid very faint alpha-blended lines in WebGL.
-      update[prefix + "gridcolor"] = palette.grid;
-      update[prefix + "gridwidth"] = 2;
-      update[prefix + "showbackground"] = true;
-      // All three planes use exactly the enclosing card colour.
-      update[prefix + "backgroundcolor"] = bg;
-      update[prefix + "showline"] = true;
-      update[prefix + "linecolor"] = palette.grid;
-      update[prefix + "linewidth"] = 1;
-      update[prefix + "zeroline"] = false;
-      update[prefix + "tickfont.color"] = palette.muted;
-      update[prefix + "tickfont.family"] = family;
-      update[prefix + "title.font.color"] = palette.text;
-      update[prefix + "title.font.family"] = family;
-    });
-    Promise.resolve(window.Plotly.relayout(el, update))
-      .then(function() {
-        return window.Plotly.restyle(el, {"marker.color": palette.point}, [0]);
-      })
-      .then(function() { lastKey = key; })
-      .catch(function(error) { console.warn("VAD appearance update:", error); })
-      .finally(function() { busy = false; });
-  }
-  function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(apply, 180);
-  }
-  document.addEventListener("change", schedule);
-  if (window.jQuery) window.jQuery(document).on("shiny:inputchanged.dreamVad", schedule);
-  var observer = new MutationObserver(schedule);
-  observer.observe(document.head, {childList: true, subtree: true, characterData: true});
-  observer.observe(document.documentElement, {attributes: true});
-  observer.observe(document.body, {attributes: true});
-  var card = el.closest(".card, .bslib-card");
-  if (card) observer.observe(card, {attributes: true});
-  el.__dreamVadCleanup = function() {
-    alive = false;
-    clearTimeout(timer);
-    observer.disconnect();
-    document.removeEventListener("change", schedule);
-    if (window.jQuery) window.jQuery(document).off("shiny:inputchanged.dreamVad", schedule);
-  };
-  apply();
+  
+  safe_labels <- htmltools::htmlEscape(x$label)
+  x$hover <- sprintf(
+    "%s<br>Nights: %d<br>Valence: %.3f<br>Arousal: %.3f<br>Dominance: %.3f",
+    safe_labels,
+    x$nights,
+    x$valence,
+    x$arousal,
+    x$dominance
+  )
+  
+  plotly::layout(
+    plotly::plot_ly(
+      x,
+      x = ~valence,
+      y = ~arousal,
+      z = ~dominance,
+      type = "scatter3d",
+      mode = "markers",
+      text = ~hover,
+      hoverinfo = "text",
+      size = ~nights,
+      sizes = c(7, 22),
+      marker = list(color = "#76559A", opacity = 0.8)
+    ),
+    scene = list(
+      xaxis = list(
+        title = "Valence: unpleasant \u2192 pleasant",
+        range = limits
+      ),
+      yaxis = list(title = "Arousal", range = limits),
+      zaxis = list(
+        title = "Dominance: low \u2192 high control",
+        range = limits
+      ),
+      aspectmode = "cube"
+    ),
+    margin = list(l = 0, r = 0, b = 0, t = 15)
+  )
 }
-')
+
+review_import_vad <- function(path, limits) {
+  x <- readr::read_csv(
+    path,
+    col_types = readr::cols(.default = readr::col_character()),
+    show_col_types = FALSE
+  )
+  
+  names(x) <- stringr::str_to_lower(stringr::str_trim(names(x)))
+  needed <- c("term", "valence", "arousal", "dominance")
+  
+  if (!all(needed %in% names(x))) {
+    stop(
+      "Prepare a CSV with columns: term,valence,arousal,dominance. ",
+      "Follow the lexicon documentation for the correct source columns."
+    )
+  }
+  
+  if (anyNA(x[needed])) {
+    stop("VAD table contains missing values.")
+  }
+  
+  x$term <- stringr::str_to_lower(stringr::str_squish(x$term))
+  if (any(!nzchar(x$term))) {
+    stop("Empty VAD terms.")
+  }
+  
+  for (column in needed[-1]) {
+    value <- suppressWarnings(as.numeric(x[[column]]))
+    if (any(!is.finite(value) | value < limits[1] | value > limits[2])) {
+      stop(
+        "Invalid or out-of-range ", column,
+        " scores. Check the documented scale."
+      )
+    }
+    x[[column]] <- value
+  }
+  
+  x <- dplyr::distinct(dplyr::select(x, dplyr::all_of(needed)))
+  if (anyDuplicated(x$term)) {
+    stop("Conflicting duplicate VAD terms; resolve them before import.")
+  }
+  
+  x
+}
+
+review_vad_matches <- function(reviews, vad) {
+  x <- dplyr::count(
+    review_emotion_long(reviews),
+    label,
+    stage,
+    name = "nights"
+  )
+  dplyr::left_join(x, vad, by = c(label = "term"))
+}
+
+review_vad_plot <- function(matches, stage, limits) {
+  x <- dplyr::filter(
+    matches,
+    .data$stage == .env$stage,
+    is.finite(valence),
+    is.finite(arousal),
+    is.finite(dominance)
+  )
+  
+  if (nrow(x)) {
+    return(.review_base_vad(matches, stage, limits))
+  }
+  
+  plotly::config(
+    plotly::layout(
+      plotly::plot_ly(),
+      xaxis = list(visible = FALSE, range = c(0, 1)),
+      yaxis = list(visible = FALSE, range = c(0, 1)),
+      annotations = list(list(
+        text = paste0(
+          "Affective-space plot unavailable.<br>",
+          "Requires reported emotions and matching terms<br>",
+          "from an imported VAD lexicon. Frequency charts are separate."
+        ),
+        x = 0.5,
+        y = 0.5,
+        xref = "paper",
+        yref = "paper",
+        showarrow = FALSE
+      )),
+      margin = list(l = 15, r = 15, b = 15, t = 15)
+    ),
+    displayModeBar = FALSE
+  )
 }
