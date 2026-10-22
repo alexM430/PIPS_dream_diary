@@ -16,6 +16,19 @@ dream_app_ui <- function(lexicons) {
                      fg = "#222222"),
     sidebar = sidebar(
       width = 260,
+      
+      # The user sees labels; Shiny receives the values on the right.
+      shiny::selectInput( # Creates drop-down menu from which user can choose theme
+        inputId = "app_colour_theme", # Names the theme
+        label = "App colour theme",
+        choices = c(
+          "Lavender (original)" = "lavender",
+          "Ocean blue" = "ocean",
+          "Forest green" = "forest"
+        ),
+        selected = "lavender"
+      ),
+      
       dateRangeInput("period", "Period shown in the charts",
                      weekstart = 1, format = "d M yyyy"),
       radioButtons("bin", "Group charts by", inline = TRUE,

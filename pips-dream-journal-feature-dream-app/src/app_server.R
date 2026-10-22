@@ -7,6 +7,45 @@
 #' @return A Shiny server function.
 dream_app_server <- function(journal_path, lexicons) {
   function(input, output, session) {
+    # Each preset defines an accent, page background, and text colour.
+    colour_presets &lt;- list(
+      lavender = list(
+        primary = "#5B4B8A",
+        bg = "#FBFAFD",
+        fg = "#222222"
+      ),
+      ocean = list(
+        primary = "#075985",
+        bg = "#F0F9FF",
+        fg = "#172554"
+      ),
+      forest = list(
+        primary = "#166534",
+        bg = "#F0FDF4",
+        fg = "#14291C"
+      )
+    )
+    
+    # Run once when the input arrives, and again whenever it changes.
+    shiny::observeEvent(input$app_colour_theme, {
+      shiny::req(input$app_colour_theme)
+      
+      # Ignore unexpected values rather than trying to use an invalid preset.
+      shiny::req(input$app_colour_theme %in% names(colour_presets))
+      colours &lt;- colour_presets[[input$app_colour_theme]]
+      
+      # Preserve the existing Bootstrap theme and update its colours.
+      updated_theme &lt;- bslib::bs_theme_update(
+        session$getCurrentTheme(),
+        primary = colours$primary,
+        bg = colours$bg,
+        fg = colours$fg
+      )
+      
+      # Send the updated theme to this user's browser.
+      session$setCurrentTheme(updated_theme)
+    })
+    
     journal <- reactiveVal(read_journal(journal_path))
     scored <- reactive(add_affect_scores(journal(), lexicons$emotion_meta))
 
