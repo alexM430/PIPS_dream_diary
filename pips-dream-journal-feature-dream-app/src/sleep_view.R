@@ -54,7 +54,7 @@ most_common_tag <- function(nights, column) {
 }
 
 #' Label (with emoji for emotions) of a tag, or a fallback when it is NA.
-tag_label <- function(tag, meta, key, fallback = "—") {
+tag_label <- function(tag, meta, key, fallback = "\u2014") {
   if (is.na(tag)) return(fallback)
   row <- match(tag, meta[[key]])
   if (is.na(row)) return(tag)
@@ -84,7 +84,7 @@ sleep_ring <- function(avg_hours, goal_hours = 8) {
       avg_hours, goal_hours, radius, radius, filled, circumference)),
     div(class = "sleep-ring-label",
         div(class = "sleep-ring-value", sprintf("%.1f h", avg_hours)),
-        div(class = "sleep-ring-caption", paste("avg. sleep · goal", goal_hours, "h")))
+        div(class = "sleep-ring-caption", paste("avg. sleep \u00B7 goal", goal_hours, "h")))
   )
 }
 
@@ -103,19 +103,19 @@ sleep_stat_bubbles <- function(summary, lexicons) {
   div(
     class = "sleep-bubbles",
     bubble("\U0001F319", summary$avg_bedtime, "avg. bedtime"),
-    bubble("☀️", summary$avg_wake, "avg. wake-up"),
-    bubble("✨", sprintf("%d / %d", summary$zone_nights, summary$n_nights),
-           sprintf("nights in the %g–%g h dream zone",
+    bubble("\u2600\uFE0F", summary$avg_wake, "avg. wake-up"),
+    bubble("\u2728", sprintf("%d / %d", summary$zone_nights, summary$n_nights),
+           sprintf("nights in the %g\u2013%g h dream zone",
                    summary$target_hours[1], summary$target_hours[2])),
-    bubble("⭐", sprintf("%.1f / 10", summary$avg_quality), "avg. sleep quality"),
-    bubble("⚡", sprintf("%.1f / 10", summary$avg_stress), "avg. stress"),
-    bubble("☁️", summary$dreams_recalled, "dreams remembered"),
+    bubble("\u2B50", sprintf("%.1f / 10", summary$avg_quality), "avg. sleep quality"),
+    bubble("\u26A1", sprintf("%.1f / 10", summary$avg_stress), "avg. stress"),
+    bubble("\u2601\uFE0F", summary$dreams_recalled, "dreams remembered"),
     bubble("\U0001F496", tag_label(summary$top_emotion, lexicons$emotion_meta, "emotion"),
            "most common feeling"),
     bubble("\U0001F52E", tag_label(summary$top_theme, lexicons$theme_meta, "theme"),
            "most common theme"),
     bubble("\U0001F3C6", format(summary$best_date, "%a %d %b"),
-           sprintf("best night · %.1f h · quality %d",
+           sprintf("best night \u00B7 %.1f h \u00B7 quality %d",
                    summary$best_hours, summary$best_quality))
   )
 }
