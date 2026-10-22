@@ -31,8 +31,11 @@ The sidebar also has an *App colour theme* menu (lavender, ocean, forest).
 
 
 ### 1. Clone the repository
+```bash
 git clone https://github.com/alexM430/PIPS_dream_diary
+```
 
+Or download it on GitHub with **Code → Download ZIP** and unzip it.
 ### 2. Open the project 
 Double-click **`PIPS_dream_diary.Rproj`**. RStudio opens in the right folder,
 and renv sets itself up automatically (the first time this can take a
