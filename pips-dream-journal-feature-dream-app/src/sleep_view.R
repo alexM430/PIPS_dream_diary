@@ -75,7 +75,7 @@ sleep_ring <- function(avg_hours, goal_hours = 8) {
     HTML(sprintf(
       '<svg viewBox="0 0 140 140" role="img" aria-label="Average sleep %.1f of %s hours">
          <defs><linearGradient id="sleepRingGradient" x1="0" y1="0" x2="1" y2="1">
-           <stop offset="0%%" stop-color="#A78BFA"/><stop offset="100%%" stop-color="#F472B6"/>
+           <stop offset="0%%" style="stop-color: var(--dream-lilac, #A78BFA)"/><stop offset="100%%" style="stop-color: var(--dream-accent-2, #F472B6)"/>
          </linearGradient></defs>
          <circle cx="70" cy="70" r="%s" class="sleep-ring-track"/>
          <circle cx="70" cy="70" r="%s" class="sleep-ring-fill"
