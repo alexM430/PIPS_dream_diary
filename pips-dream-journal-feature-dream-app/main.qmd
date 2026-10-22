@@ -1,62 +1,159 @@
----
-title: "Dream Journal: an app for exploring dreams, emotions and sleep"
-format: html
-execute:
-  warning: false
----
+# Project overview
 
-## Setup
+Many people keep a dream diary, but a pile of written dreams is hard to make
+sense of. To help people keep track of their dreams in a pleasant way, we built a Shiny app in which one person can log their dreams and explore such patterns. We also added a simple statistical test that the user can run on their own diary.
 
-Run this document from the project root. It loads the packages and the
-functions in `src/`.
+::: {.callout-important}
+## Please read first
 
-```{r}
+- **This is a hobby app for personal use.** It helps people reflect on their
+  own dreams. It is not a scientific instrument, not a diagnostic tool, and
+  its sleep tips are general suggestions, not medical advice. Anyone troubled
+  by frequent nightmares or poor sleep should talk to a doctor.
+- **All data in this project are fake.** We did not collect dreams from real
+  people. The demo journal is *simulated*: we generated 180 nights of one
+  fictional dreamer with a computer program, and we chose how stress and
+  sleep affect the dreams ourselves. The results in this report therefore say
+  nothing about real dreamers. They only show that our analysis works.
+:::
+
+## What we did
+
+1. **Built the app** (`src/`). For each night the user records bedtime, wake
+   time, sleep quality, stress, the dream itself, and how they felt while
+   dreaming and after waking. The app suggests themes, emotions, people,
+   animals and objects by matching the dream text against word lists
+   (`data/lexicons/`); suggestions only count once the user confirms them.
+   Tabs then show theme clouds, emotion charts and a 3D emotion map, a
+   calendar, sleep statistics with tips, and a search.
+2. **Simulated a dream journal** (`src/simulate_journal.R`). We generated a fake sleep diary with known effects of stress and sleep built in.
+3. **Added a statistical test**, a logistic regression (`src/analysis.R`),
+   which asks whether stress and short sleep go with negative dreams. It runs
+   in this report on the fake journal and in the app's *Your patterns* tab on
+   the user's own diary.
+4. **Protected privacy.** The app starts in a read-only demo mode with the
+   fake journal. With demo mode off, the user's own diary exists only in the
+   current session and is never written to the project folder; they download
+   it as a CSV and upload it again next time.
+5. **Tested the code** with unit tests in `tests/testthat/`.
+
+# Research question
+
+> **Does more stress the day before, and less sleep, increase the chance that
+> a dream is negative?**
+
+According to the *continuity hypothesis*, dreams reflect waking-life
+experiences and concerns (Schredl & Hofmann, 2003). Stressful days should
+therefore be followed by more unpleasant dreams, and stress is indeed linked
+to more frequent nightmares (Schredl, 2003). Sleep loss, in turn, makes
+emotional processing more negative (Walker & van der Helm, 2009).
+
+# Data
+
+Run this document from the project folder
+(`pips-dream-journal-feature-dream-app/`). The chunk below loads the packages
+and the functions in `src/`.
+
+```{r setup}
 source("src/setup.R")
 ```
 
-## Simulated dream journal
+## The simulated (fake) dream journal
 
-We simulate 180 nights of one dreamer (`src/simulate_journal.R`). Stress
-follows a weekly rhythm; stressful days lead to later bedtimes, shorter and
-worse sleep, and a higher chance of a negative dream. Dream texts are built
-from templates whose words appear in the word lists in `data/lexicons/`, so
-the app can detect themes, emotions, people and objects in them.
+`simulate_dream_journal()` generates 180 nights of one fictional dreamer in
+steps. The simulation is built on a few assumptions:
+
+- **Stress** (1–10) is higher Monday to Thursday and carries over from one
+  day to the next.
+- **Sleep:** stressful days lead to later bedtimes and shorter, worse sleep;
+  weekends add sleep, and some nights are cut short.
+- **Dream tone:** whether a dream is negative is decided by a logistic
+  formula in which *we set the effects ourselves*. These values were not taken from the literature. We chose them to be plausible: stress and sleep are centred on an average day (stress 5 on a 1–10 scale) and a typical night (7.4 hours, within the recommended 7–9 hours;
+Hirshkowitz et al., 2015); the intercept of −0.2 makes about 45% of average nights negative; and the effects (odds ratios of 1.57 per stress point and 0.61 per hour of sleep) point in the directions predicted by theory and are large enough to be detectable in 180 nights. Their exact sizes are assumptions.
+
+$$
+\text{logit}\,P(\text{negative}) = -0.2 + 0.45\,(\text{stress} - 5) - 0.5\,(\text{sleep hours} - 7.4)
+$$
+
+- **Recall:** dreams are remembered more often after longer sleep; forgotten
+  dreams have no text.
+- **Dream text:** negative dreams get negative themes and feelings (e.g.
+  falling, fear), the others positive ones (e.g. flying, joy). The texts are
+  built from templates whose words appear in `data/lexicons/`, so the app can
+  recognise them.
 
 ```{r}
-journal <- simulate_dream_journal(n_nights = 180, seed = 2026)
+sim <- simulate_dream_journal(n_nights = 180, seed = 2026, return_details = TRUE)
+journal <- sim$journal
 head(journal[, c("date", "bedtime", "sleep_hours", "stress", "themes", "emotions")])
 ```
 
-The app keeps its entries and reviewed labels in one snapshot,
-`data/reviewed_dream_journal.rds`, which ships with the repository (180
-synthetic nights with simulated reviewed labels). If the snapshot is missing,
-the app builds a new one from `data/dream_journal.csv`, which we create here
-from the simulated nights when it does not exist yet.
+### The known effects
+
+Because we wrote the formula, we know the true answer to our research
+question in this fake data. 
+
+| Predictor | True effect (log-odds) | As odds ratio | Meaning |
+|-----------|-----------------------|---------------|---------|
+| Stress | `r sim$parameters$stress_on_negative` | `r round(exp(sim$parameters$stress_on_negative), 2)` | each extra stress point multiplies the odds of a negative dream by this |
+| Sleep | `r sim$parameters$sleep_on_negative` | `r round(exp(sim$parameters$sleep_on_negative), 2)` | each extra hour of sleep multiplies the odds by this |
+
+For example, at average sleep the chance of a negative dream is about 17% at
+stress 2, 45% at stress 5 and 76% at stress 8.
+
+### How we chose the parameters
+
+The simulation is a test bed, not a model of real dreamers, so its values
+need to be *plausible*, not exact. The *directions* of the effects follow
+the theory above: stress shortens sleep and makes negative dreams more
+likely, more sleep makes them less likely. A few values are anchored in the
+literature: 7.4 hours of sleep lies within the recommended 7–9 hours for
+adults (Hirshkowitz et al., 2015), people sleep longer on free days
+(Wittmann et al., 2006), and about half of dreams being negative fits
+dreamers' own ratings of their dream emotions (Schredl & Doll, 1998). The
+*sizes* of the effects, the weekly stress rhythm and the recall rate are our
+own assumptions, chosen to give a clear, testable pattern; an 80% recall
+rate is probably higher than in real home diaries.
+
+```{r}
+justifications <- c(
+  sleep_mean = "Within the recommended 7-9 h for adults (Hirshkowitz et al., 2015).",
+  weekend_sleep_bonus = "Longer sleep on free days (Wittmann et al., 2006); size assumed.",
+  negative_intercept = "About half of dreams negative, as in self-rated dream emotions (Schredl & Doll, 1998).",
+  stress_on_negative = "Direction from the continuity hypothesis (Schredl & Hofmann, 2003); size assumed.",
+  sleep_on_negative = "Direction from Walker & van der Helm (2009); size assumed.",
+  recall_prob = "Assumed; likely higher than recall in home diaries."
+)
+knitr::kable(simulation_parameter_table(sim, justifications))
+```
+
+## The demo snapshot
+
+The app's demo journal is stored in `data/reviewed_dream_journal.rds`: 180
+fake nights, their simulated labels and the emotion lexicon. The app only
+reads this file, and only in demo mode; nothing a user writes is ever saved
+to it or to any other file in the project. If the snapshot is missing, the
+app rebuilds it from the simulated `data/dream_journal.csv`, which we create
+here when it does not exist yet.
 
 ```{r}
 journal_path <- "data/dream_journal.csv"
 if (!file.exists(journal_path)) write_journal(journal, journal_path)
 ```
 
-## Analysis: do stress and short sleep make negative dreams more likely?
+## Variables used
 
-According to the continuity hypothesis, dreams reflect waking-life
-experiences and concerns (Schredl & Hofmann, 2003). Stressful days should
-therefore be followed by more unpleasant dreams, and stress is indeed linked
-to more frequent nightmares (Schredl, 2003). Sleep loss, in turn, makes
-emotional processing more negative (Walker & van der Helm, 2009). We test
-both predictors in the dreamer's journal:
+For every night with feelings reported *while dreaming*, we look up each
+feeling in the NRC VAD lexicon (Mohammad, 2025), which rates words from
+unpleasant (−1) to pleasant (+1). Nights without such feelings are left out.
 
-> **Research question:** Does more stress the day before, and less sleep,
-> increase the chance that a dream is negative?
-
-### Data
-
-We use the journal snapshot the app works with
-(`data/reviewed_dream_journal.rds`). For every night with feelings reported
-*while dreaming*, we look up each feeling in the NRC VAD lexicon (Mohammad,
-2025), which rates words from unpleasant (−1) to pleasant (+1). A dream counts
-as **negative** when the average valence of its feelings is below 0.
+| Variable | Meaning |
+|----------|---------|
+| `negative` | **Outcome:** 1 if the average valence of the dream's feelings is below 0, otherwise 0 |
+| `stress` | **Predictor:** stress the day before, 1–10 |
+| `sleep_hours` | **Predictor:** hours slept that night |
+| `valence` | Average valence of the feelings, −1 to +1 |
+| `n_feelings` | Number of feelings found in the lexicon |
 
 ```{r}
 snapshot <- readRDS("data/reviewed_dream_journal.rds")
@@ -67,14 +164,72 @@ head(dreams)
 `r nrow(dreams)` nights have feelings found in the lexicon;
 `r round(100 * mean(dreams$negative))`% of these dreams were negative.
 
-### Model
+# Analysis
 
-The outcome is binary (negative dream: yes/no), so we fit a **logistic
-regression** with stress the day before (1–10) and hours slept as predictors.
-Odds ratios above 1 mean the predictor goes with *more* negative dreams.
+## How we came to the model
+
+We built the model from three decisions:
+
+1. **What to predict.** Our question is whether a dream *was negative or
+   not*, a yes/no outcome. We measure it with valence, the core dimension of
+   emotion (Russell, 1980), using published valence ratings (Mohammad, 2025)
+   for the feelings reported while dreaming, and call a dream negative when
+   its average valence is below the neutral midpoint, 0. We fixed this rule
+   before looking at results.
+2. **Which predictors.** Stress the day before and hours of sleep, chosen
+   from theory (see *Research question*), not by searching the data. Both go
+   into one model because they are related (stressful days bring shorter
+   sleep), so each effect is estimated while holding the other constant.
+3. **Which model.** A yes/no outcome needs a model for a *probability*, which
+   must stay between 0 and 1. Ordinary linear regression can predict values
+   outside that range. **Logistic regression**, the standard generalized
+   linear model for a binary outcome (Nelder & Wedderburn, 1972; Hosmer,
+   Lemeshow & Sturdivant, 2013), solves this by modelling the *log-odds*
+   (logit) of the probability, which can take any value:
+
+$$
+\text{logit}\,P(\text{negative}_i = 1) = \log\frac{P}{1 - P} = \beta_0 + \beta_1\,\text{stress}_i + \beta_2\,\text{sleep hours}_i
+$$
+
+The β's are not chosen by us: R estimates them from the data (maximum
+likelihood). e^β^ is the **odds ratio**: above 1 means the predictor goes
+with *more* negative dreams, below 1 with *fewer*. Each β is tested with a
+two-sided **Wald *z*-test** at α = .05, and we report 95% confidence
+intervals. In R this is one line in `fit_negative_dream_model()`:
+`glm(negative ~ stress + sleep_hours, family = binomial)`.
+
+The model also assumes that the effect of stress does not depend on sleep
+(no interaction), that each extra point or hour changes the log-odds by the
+same amount, and that nights are independent of each other.
+
+The model is only fitted when there are at least 20 nights with feelings,
+both negative and non-negative dreams, and variation in stress and sleep;
+otherwise the app shows a plain-language message instead.
 
 ```{r}
 model <- fit_negative_dream_model(dreams)
+```
+
+## What we use the model for
+
+The model has two jobs:
+
+1. **In this report: check that the method works.** We fit it to the fake
+   journal and compare the estimated odds ratios with the known effects we
+   built in. If the test finds them, it can detect a real effect of this
+   size with this much data. This is a check of the *method*, not a finding
+   about dreams.
+2. **In the app: a personal mirror.** The *Your patterns* tab runs the same
+   functions on any period the user picks, in the demo journal or in their
+   own diary. It shows how many nights were analysed, the share of negative
+   dreams, the odds ratios, a plot of the predicted chance of a negative
+   dream across stress levels, and a plain-language summary. It is meant to
+   help a user notice patterns in their own life, for example "on my
+   stressful days my dreams were more often negative", not to prove a scientific study.
+
+# Results
+
+```{r}
 results <- negative_dream_results(model)
 results$p_value <- vapply(results$p_value, format_p, character(1))
 knitr::kable(results, digits = 2,
@@ -87,59 +242,76 @@ knitr::kable(results, digits = 2,
 plot_negative_dream_model(model)
 ```
 
-### Interpretation
-
 ```{r}
 #| echo: false
 #| results: asis
 cat(paste("-", describe_negative_dream_model(model)), sep = "\n")
 ```
 
-The figure shows the chance of a negative dream predicted by the model for
-6 and 8 hours of sleep: it rises steeply with stress, while the two sleep
-lines lie close together. Stress and sleep are related in these data
+**Estimated vs. known effects.**
+
+```{r}
+estimated <- negative_dream_results(model)
+comparison <- data.frame(
+  Predictor = c("Stress (per point)", "Sleep (per hour)"),
+  `Known odds ratio` = exp(c(sim$parameters$stress_on_negative,
+                             sim$parameters$sleep_on_negative)),
+  `Estimated odds ratio` = estimated$odds_ratio,
+  `95% CI` = sprintf("%.2f-%.2f", estimated$ci_low, estimated$ci_high),
+  check.names = FALSE
+)
+knitr::kable(comparison, digits = 2)
+```
+
+If a known odds ratio lies inside the 95% confidence interval, the analysis
+recovered that effect.
+
+**Robustness check.** Turning valence into yes/no throws away information
+(MacCallum et al., 2002), so we also fit a linear regression on the average
+valence itself. Negative coefficients here mean *less pleasant* dreams.
+
+```{r}
+robust <- lm(valence ~ stress + sleep_hours, data = dreams)
+knitr::kable(summary(robust)$coefficients, digits = 3)
+```
+
+Stress and sleep are related in these data
 (*r* = `r round(cor(dreams$stress, dreams$sleep_hours), 2)`), so part of any
 sleep effect may be absorbed by stress.
 
-**Limitations.** The data are simulated: `simulate_dream_journal()` builds in
-effects of both stress (odds ratio ≈ `r round(exp(0.45), 2)` per point) and
-sleep (≈ `r round(exp(-0.5), 2)` per hour) on negative dreams. The model
-recovers the stress effect, which mainly shows that the method works. It does
-not detect the sleep effect: sleep varies little in these nights
-(SD = `r round(sd(dreams$sleep_hours), 2)` h vs. `r round(sd(dreams$stress), 2)`
-stress points) and overlaps with stress, so `r nrow(dreams)` nights give too
-little power to separate the two. All nights come from one person and are not
-independent of each other (e.g. stressful weeks), the outcome depends on how
-well the lexicon captures the reported feelings, and the result is an
-association, not proof of cause. With real diaries from several people, a
-multilevel model with nights nested in dreamers would be the next step.
+# Discussion
 
-The app's **Your patterns** tab runs this same analysis on the user's own
-journal for any period.
+Finding an effect that we built into fake data shows that the method works;
+it does **not** show that stress or sleep affect real dreams.
 
-## The app
+**Limitations.**
 
-Run the chunk below in RStudio (or `source("src/setup.R"); run_dream_app()` in
-an R console). It does not launch while rendering this document. A cloudy
-loading screen shows for a few seconds; tap it to skip.
+- *Fake data.* The data are simulated with effect sizes we chose ourselves,
+  and the simulator uses the same logistic form we then fit, so the model
+  fits these data by design.
+- *Power.* Sleep varies less than stress in these nights
+  (SD = `r round(sd(dreams$sleep_hours), 2)` h vs.
+  `r round(sd(dreams$stress), 2)` stress points) and overlaps with it, so
+  `r nrow(dreams)` nights may be too few to separate the two effects. A
+  personal diary of a few weeks has even less power, and about 10 cases per
+  predictor in the smaller outcome group are recommended (Peduzzi et al.,
+  1996; Vittinghoff & McCulloch, 2007).
+- *Dependence.* All nights come from one person and are not independent
+  (e.g. stressful weeks), which logistic regression assumes they are.
+- *Measurement.* Word-level valence ratings are not a direct measure of how
+  negative a whole dream felt.
+- *Causality.* The design is observational: the test shows an association,
+  not that stress *causes* negative dreams.
+- *Exploring in the app.* A user can try many periods in *Your patterns*
+  until something looks significant. That is fine for personal reflection;
+  the analysis in this report is the single test we planned in advance, on
+  all nights at α = .05.
 
-| Tab | What it shows |
-|-----|---------------|
-| New dream | Write or edit a night step by step: sleep, dream text, feelings while dreaming and after waking, themes, and the people, animals and objects that appeared |
-| Dream themes | Themes as clouds (bigger = more frequent) for the last week, month, year, all nights or a custom period, plus stress per theme |
-| Emotions | Feelings while dreaming vs. after waking, and an optional 3D valence-arousal-dominance map |
-| Your patterns | The analysis above, run on your own journal |
-| People & things | Who and what recur in confirmed entries |
-| Calendar | Day, week or month view, coloured by sleep quality, stress or hours slept |
-| Sleep | Sleep ring, stats, charts, tips and a shareable story picture |
-| Search | Search dream text and all labels |
-| Settings | Theme definitions, renaming labels, remembered names, export |
-
-The sidebar also has an *App colour theme* menu (lavender, ocean, forest).
-
-```{r}
-if (interactive()) run_dream_app()
-```
+**Implications.** For real research, the next step would be real diaries
+from many people and a multilevel model with nights nested in dreamers
+(Bolger & Laurenceau, 2013). For the app, the test is a light-weight way for
+hobby users to look at their own patterns, with the clear message that it
+shows a pattern for one person, not a cause.
 
 ## References
 
