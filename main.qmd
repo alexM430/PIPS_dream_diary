@@ -1,3 +1,11 @@
+title: "Dream Journal: an app for exploring dreams, emotions and sleep"
+author: "PIPS Group: Alex Müller, Anna Karumdize, Farah Qureshi"
+format: html
+execute:
+  echo: true
+  warning: false
+  message: false
+
 # Project overview
 
 Many people keep a dream diary, but a pile of written dreams is hard to make
@@ -182,8 +190,7 @@ We built the model from three decisions:
 3. **Which model.** A yes/no outcome needs a model for a *probability*, which
    must stay between 0 and 1. Ordinary linear regression can predict values
    outside that range. **Logistic regression**, the standard generalized
-   linear model for a binary outcome (Nelder & Wedderburn, 1972; Hosmer,
-   Lemeshow & Sturdivant, 2013), solves this by modelling the *log-odds*
+   linear model for a binary outcome (Nelder & Wedderburn, 1972), solves this by modelling the *log-odds*
    (logit) of the probability, which can take any value:
 
 $$
@@ -292,9 +299,7 @@ it does **not** show that stress or sleep affect real dreams.
   (SD = `r round(sd(dreams$sleep_hours), 2)` h vs.
   `r round(sd(dreams$stress), 2)` stress points) and overlaps with it, so
   `r nrow(dreams)` nights may be too few to separate the two effects. A
-  personal diary of a few weeks has even less power, and about 10 cases per
-  predictor in the smaller outcome group are recommended (Peduzzi et al.,
-  1996; Vittinghoff & McCulloch, 2007).
+  personal diary of a few weeks has even less power.
 - *Dependence.* All nights come from one person and are not independent
   (e.g. stressful weeks), which logistic regression assumes they are.
 - *Measurement.* Word-level valence ratings are not a direct measure of how
@@ -312,6 +317,45 @@ from many people and a multilevel model with nights nested in dreamers
 hobby users to look at their own patterns, with the clear message that it
 shows a pattern for one person, not a cause.
 
+# The app
+
+Rendering this report does **not** start the app: a Shiny app needs R to
+keep running while you use it. To open it, run these two lines in the R
+console, or click the green ▶ (*Run Current Chunk*) on the chunk below in
+RStudio:
+
+```{r}
+#| eval: false
+source("src/setup.R")
+run_dream_app()
+```
+
+A cloudy loading screen shows for a few seconds (click it to skip), then the
+app opens in your browser or the RStudio viewer. Stop it with the red
+**Stop** button in the console, or press **Esc**.
+
+| Tab | What it shows |
+|-----|---------------|
+| New dream | Write or edit a night step by step: sleep, dream text, feelings while dreaming and after waking, themes, and the people, animals and objects that appeared |
+| Dream themes | Themes as clouds (bigger = more frequent) for the last week, month, year, all nights or a custom period, plus stress per theme |
+| Emotions | Feelings while dreaming vs. after waking, and an optional 3D valence-arousal-dominance map |
+| Your patterns | The logistic regression from this report, run on the chosen period |
+| People & things | Who and what recur in confirmed entries |
+| Calendar | Day, week or month view, coloured by sleep quality, stress or hours slept |
+| Sleep | Sleep ring, stats, charts, tips and a shareable story picture |
+| Search | Search dream text and all labels |
+| Settings | Theme definitions, renaming labels, remembered names, export |
+
+The app starts in **demo mode** with the fake journal. Switch demo mode off
+in the sidebar to try your own diary; it is kept only for this session, so
+use *Download my diary (CSV)* if you want to keep it.
+
+# Reproducibility
+
+See `README.md` for installation. Package versions are recorded in
+`renv.lock`, the simulation uses a fixed seed (`seed = 2026`), and the unit
+tests run with `testthat::test_dir("tests/testthat")`
+
 ## References
 
 Mohammad, S. M. (2025). NRC VAD Lexicon v2: Norms for valence, arousal, and
@@ -328,6 +372,16 @@ dream activities. *Consciousness and Cognition, 12*(2), 298–308.
 
 Walker, M. P., & van der Helm, E. (2009). Overnight therapy? The role of sleep
 in emotional brain processing. *Psychological Bulletin, 135*(5), 731–748.
+
+MacCallum, R. C., Zhang, S., Preacher, K. J., & Rucker, D. D. (2002). On the practice of dichotomization of quantitative variables. Psychological Methods, 7(1), 19–40. https://doi.org/10.1037/1082-989X.7.1.19
+
+Bolger, N., & Laurenceau, J. P. (2013). Intensive longitudinal methods: An introduction to diary and experience sampling research. Guilford press.
+
+Nelder, J. A., & Wedderburn, R. W. (1972). Generalized linear models. Journal of the Royal Statistical Society Series A: Statistics in Society, 135(3), 370-384.
+
+Schredl, M., & Doll, E. (1998). Emotions in diary dreams. Consciousness and cognition, 7(4), 634-646.
+
+Wittmann, M., Dinich, J., Merrow, M., & Roenneberg, T. (2006). Social jetlag: misalignment of biological and social time. Chronobiology international, 23(1-2), 497-509.
 
 ```{r}
 #| echo: false

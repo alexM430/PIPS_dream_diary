@@ -9,7 +9,7 @@ Users can reupload their diary at a later moment to continue filling it in.
 
 ## Requirements
 
-Requires R ≥ 4.4.1 to render `main.qmd`.
+Requires R 4.6.1 to render `main.qmd`.
 
 ## Features
 
@@ -48,20 +48,34 @@ Not using RStudio? Start R in the `PIPS_dream_diary` folder instead, or run
 
 ``` r
 install.packages("renv") # Only the first time
-renv::init()
 renv::activate()
+renv::restore()
+
+
+**If `renv::restore()` fails**, install the packages directly instead:
 
 install.packages(c(
   "shiny", "bslib", "dplyr", "tidyr", "ggplot2", "readr",
   "stringr", "lubridate", "purrr", "tibble", "plotly",
-  "htmltools", "scales", "testthat"
+  "htmltools", "scales", "knitr", "rmarkdown", "testthat"
 ))
-renv::snapshot()
 
 ```
-### 4. Open main.qmd and try the app
-Open main.qmd, click render and follow the steps explained.
+### 4. Read the report
 
+Open `main.qmd` and click **Render**. The report opens as a web page.
+
+### 5. Open the app
+
+Rendering does not start the app. In the R console, run:
+
+```r
+source("src/setup.R")
+run_dream_app()
+```
+
+The app opens in your browser or the RStudio viewer. Stop it with the red
+**Stop** button in the console.
 
 ## Structure
 
